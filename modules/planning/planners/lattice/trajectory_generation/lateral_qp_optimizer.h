@@ -45,7 +45,7 @@ class LateralQPOptimizer {
   virtual std::vector<common::FrenetFramePoint> GetFrenetFramePath() const;
 
  protected:
-  double delta_s_ = FLAGS_default_delta_s_lateral_optimization;
+  double delta_s_ = FLAGS_default_delta_s_lateral_optimization; ///< 1.0
 
   std::vector<double> opt_d_;
 

@@ -126,17 +126,18 @@ void Trajectory1dGenerator::GenerateLateralTrajectoryBundle(
     GenerateTrajectory1DBundle<5>(init_lat_state_, end_conditions,
                                   ptr_lat_trajectory_bundle);
   } else {
+    ///默认该算法
     double s_min = init_lon_state_[0];
-    double s_max = s_min + FLAGS_max_s_lateral_optimization;
+    double s_max = s_min + FLAGS_max_s_lateral_optimization;///< + 60
 
-    double delta_s = FLAGS_default_delta_s_lateral_optimization;
+    double delta_s = FLAGS_default_delta_s_lateral_optimization; ///< 1.0
 
     auto lateral_bounds =
         ptr_path_time_graph_->GetLateralBounds(s_min, s_max, delta_s);
 
     // LateralTrajectoryOptimizer lateral_optimizer;
     std::unique_ptr<LateralQPOptimizer> lateral_optimizer(
-        new LateralOSQPOptimizer);
+        new LateralOSQPOptimizer);///< 优化器，LateralOSQPOptimizer是子类，这样写有多态的优势
 
     lateral_optimizer->optimize(init_lat_state_, delta_s, lateral_bounds);
 

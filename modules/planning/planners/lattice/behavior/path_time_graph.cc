@@ -319,7 +319,7 @@ std::vector<std::pair<double, double>> PathTimeGraph::GetLateralBounds(
   std::vector<double> discretized_path;
   double s_range = s_end - s_start;
   double s_curr = s_start;
-  size_t num_bound = static_cast<size_t>(s_range / s_resolution);
+  size_t num_bound = static_cast<size_t>(s_range / s_resolution);           
 
   const auto& vehicle_config =
       common::VehicleConfigHelper::Instance()->GetConfig();
@@ -327,24 +327,25 @@ std::vector<std::pair<double, double>> PathTimeGraph::GetLateralBounds(
 
   // Initialize bounds by reference line width
   for (size_t i = 0; i < num_bound; ++i) {
-    double left_width = FLAGS_default_reference_line_width / 2.0;
-    double right_width = FLAGS_default_reference_line_width / 2.0;
+    double left_width = FLAGS_default_reference_line_width / 2.0; ///< 4*0.5
+    double right_width = FLAGS_default_reference_line_width / 2.0; ///< 默认
     ptr_reference_line_info_->reference_line().GetLaneWidth(s_curr, &left_width,
-                                                            &right_width);
+                                                            &right_width); ///< 获取当前位置的车道宽度
     double ego_d_lower = init_d_[0] - ego_width / 2.0;
     double ego_d_upper = init_d_[0] + ego_width / 2.0;
+    ///bounds中first是下边界。second是上边界
     bounds.emplace_back(
         std::min(-right_width, ego_d_lower - FLAGS_bound_buffer),
         std::max(left_width, ego_d_upper + FLAGS_bound_buffer));
     discretized_path.push_back(s_curr);
     s_curr += s_resolution;
   }
-
+  ///静态障碍物
   for (const SLBoundary& static_sl_boundary : static_obs_sl_boundaries_) {
     UpdateLateralBoundsByObstacle(static_sl_boundary, discretized_path, s_start,
                                   s_end, &bounds);
   }
-
+  ///bounds就是边界
   for (size_t i = 0; i < bounds.size(); ++i) {
     bounds[i].first += ego_width / 2.0;
     bounds[i].second -= ego_width / 2.0;
@@ -360,32 +361,36 @@ void PathTimeGraph::UpdateLateralBoundsByObstacle(
     const SLBoundary& sl_boundary, const std::vector<double>& discretized_path,
     const double s_start, const double s_end,
     std::vector<std::pair<double, double>>* const bounds) {
+      ///如果障碍物的起始s大于路径的结束s，或者障碍物的结束s小于路径的开始s，直接返回
   if (sl_boundary.start_s() > s_end || sl_boundary.end_s() < s_start) {
     return;
   }
+  ///在路径上找到障碍物的起始s和结束s
   auto start_iter = std::lower_bound(
-      discretized_path.begin(), discretized_path.end(), sl_boundary.start_s());
+      discretized_path.begin(), discretized_path.end(), sl_boundary.start_s()); ///< 返回第一个大于等于sl_boundary.start_s()的元素的迭代器
   auto end_iter = std::upper_bound(
-      discretized_path.begin(), discretized_path.end(), sl_boundary.start_s());
+      discretized_path.begin(), discretized_path.end(), sl_boundary.start_s());///< 返回第一个大于sl_boundary.start_s()的元素的迭代器
   size_t start_index = start_iter - discretized_path.begin();
   size_t end_index = end_iter - discretized_path.begin();
   if (sl_boundary.end_l() > -FLAGS_numerical_epsilon &&
       sl_boundary.start_l() < FLAGS_numerical_epsilon) {
     for (size_t i = start_index; i < end_index; ++i) {
-      bounds->operator[](i).first = -FLAGS_numerical_epsilon;
+      bounds->operator[](i).first = -FLAGS_numerical_epsilon; ///< 非常小的值
       bounds->operator[](i).second = FLAGS_numerical_epsilon;
     }
     return;
   }
+  ///明确下，end_l是目标上边界，start_l是目标下边界
   if (sl_boundary.end_l() < FLAGS_numerical_epsilon) {
     for (size_t i = start_index; i < std::min(end_index + 1, bounds->size());
          ++i) {
       bounds->operator[](i).first =
           std::max(bounds->operator[](i).first,
-                   sl_boundary.end_l() + FLAGS_nudge_buffer);
+                   sl_boundary.end_l() + FLAGS_nudge_buffer); ///< + 0.3
     }
     return;
   }
+  ///目标下边界大于0
   if (sl_boundary.start_l() > -FLAGS_numerical_epsilon) {
     for (size_t i = start_index; i < std::min(end_index + 1, bounds->size());
          ++i) {

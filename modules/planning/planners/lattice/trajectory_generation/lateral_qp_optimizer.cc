@@ -25,10 +25,10 @@ PiecewiseJerkTrajectory1d LateralQPOptimizer::GetOptimalTrajectory() const {
   ACHECK(!opt_d_.empty() && !opt_d_prime_.empty() && !opt_d_pprime_.empty());
 
   PiecewiseJerkTrajectory1d optimal_trajectory(
-      opt_d_.front(), opt_d_prime_.front(), opt_d_pprime_.front());
+      opt_d_.front(), opt_d_prime_.front(), opt_d_pprime_.front());///<初始位置，初始横向速度，初始横向加速度
 
   for (size_t i = 1; i < opt_d_.size(); ++i) {
-    double j = (opt_d_pprime_[i] - opt_d_pprime_[i - 1]) / delta_s_;
+    double j = (opt_d_pprime_[i] - opt_d_pprime_[i - 1]) / delta_s_; ///<横向加加速度
     optimal_trajectory.AppendSegment(j, delta_s_);
   }
   return optimal_trajectory;

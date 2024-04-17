@@ -26,59 +26,60 @@ namespace planning {
 bool LateralOSQPOptimizer::optimize(
     const std::array<double, 3>& d_state, const double delta_s,
     const std::vector<std::pair<double, double>>& d_bounds) {
-  std::vector<c_float> P_data;
-  std::vector<c_int> P_indices;
-  std::vector<c_int> P_indptr;
-  CalculateKernel(d_bounds, &P_data, &P_indices, &P_indptr);
+  std::vector<c_float> P_data; ///< 非零的数据
+  std::vector<c_int> P_indices; ///<非0元素对应的行
+  std::vector<c_int> P_indptr; ///<稀疏矩阵中表示非0元素几个
+  ///稀疏矩阵
+  CalculateKernel(d_bounds, &P_data, &P_indices, &P_indptr); ///<目标就是得P矩阵
   delta_s_ = delta_s;
-  const int num_var = static_cast<int>(d_bounds.size());
-  const int kNumParam = 3 * static_cast<int>(d_bounds.size());
-  const int kNumConstraint = kNumParam + 3 * (num_var - 1) + 3;
+  const int num_var = static_cast<int>(d_bounds.size()); ///< 60
+  const int kNumParam = 3 * static_cast<int>(d_bounds.size()); ///< 3* 60 
+  const int kNumConstraint = kNumParam + 3 * (num_var - 1) + 3; ///< 180 + 3*59  + 3 = 360
   c_float lower_bounds[kNumConstraint];
   c_float upper_bounds[kNumConstraint];
 
-  const int prime_offset = num_var;
-  const int pprime_offset = 2 * num_var;
+  const int prime_offset = num_var; ///< 60
+  const int pprime_offset = 2 * num_var; ///< 120
 
   std::vector<std::vector<std::pair<c_int, c_float>>> columns;
-  columns.resize(kNumParam);
+  columns.resize(kNumParam); ///< 矩阵 180
 
   int constraint_index = 0;
 
-  // d_i+1'' - d_i''
-  for (int i = 0; i + 1 < num_var; ++i) {
-    columns[pprime_offset + i].emplace_back(constraint_index, -1.0);
-    columns[pprime_offset + i + 1].emplace_back(constraint_index, 1.0);
+  ///约束1横向加加速度应在一定范围内
+  ///其实这里就是实现第二行第三块部分,按列来着
+  for (int i = 0; i + 1 < num_var; ++i) { ///< 60
+    columns[pprime_offset + i].emplace_back(constraint_index, -1.0); ///< 120 ~ 178
+    columns[pprime_offset + i + 1].emplace_back(constraint_index, 1.0);///< 121 ~ 179
 
     lower_bounds[constraint_index] =
-        -FLAGS_lateral_third_order_derivative_max * delta_s_;
+        -FLAGS_lateral_third_order_derivative_max * delta_s_; ///< -0.1*1
     upper_bounds[constraint_index] =
-        FLAGS_lateral_third_order_derivative_max * delta_s_;
+        FLAGS_lateral_third_order_derivative_max * delta_s_; ///< 0.1*1
     ++constraint_index;
   }
 
-  // d_i+1' - d_i' - 0.5 * ds * (d_i'' + d_i+1'')
+  ///约束2轨迹应该光滑，即导数连续相邻两个采样点的斜率
   for (int i = 0; i + 1 < num_var; ++i) {
-    columns[prime_offset + i].emplace_back(constraint_index, -1.0);
-    columns[prime_offset + i + 1].emplace_back(constraint_index, 1.0);
-    columns[pprime_offset + i].emplace_back(constraint_index, -0.5 * delta_s_);
-    columns[pprime_offset + i + 1].emplace_back(constraint_index,
-                                                -0.5 * delta_s_);
+    columns[prime_offset + i].emplace_back(constraint_index, -1.0); ///< prime_offset = 60, 60 ~ 118
+    columns[prime_offset + i + 1].emplace_back(constraint_index, 1.0);///< 61 ~ 119
+    columns[pprime_offset + i].emplace_back(constraint_index, -0.5 * delta_s_); ///< pprime_offset = 120 120 ~ 178
+    columns[pprime_offset + i + 1].emplace_back(constraint_index, -0.5 * delta_s_);///< 121 ~ 179
 
     lower_bounds[constraint_index] = 0.0;
     upper_bounds[constraint_index] = 0.0;
     ++constraint_index;
   }
 
-  // d_i+1 - d_i - d_i' * ds - 1/3 * d_i'' * ds^2 - 1/6 * d_i+1'' * ds^2
+  ///约束3轨迹应该保持连续
   for (int i = 0; i + 1 < num_var; ++i) {
-    columns[i].emplace_back(constraint_index, -1.0);
-    columns[i + 1].emplace_back(constraint_index, 1.0);
-    columns[prime_offset + i].emplace_back(constraint_index, -delta_s_);
+    columns[i].emplace_back(constraint_index, -1.0); ///< 0 ~ 58
+    columns[i + 1].emplace_back(constraint_index, 1.0); ///< 1 ~ 59
+    columns[prime_offset + i].emplace_back(constraint_index, -delta_s_); ///< 60 ~ 118
     columns[pprime_offset + i].emplace_back(constraint_index,
-                                            -delta_s_ * delta_s_ / 3.0);
+                                            -delta_s_ * delta_s_ / 3.0); ///< 120 ~ 178
     columns[pprime_offset + i + 1].emplace_back(constraint_index,
-                                                -delta_s_ * delta_s_ / 6.0);
+                                                -delta_s_ * delta_s_ / 6.0); ///< 121 ~ 179
 
     lower_bounds[constraint_index] = 0.0;
     upper_bounds[constraint_index] = 0.0;
@@ -86,17 +87,17 @@ bool LateralOSQPOptimizer::optimize(
   }
 
   columns[0].emplace_back(constraint_index, 1.0);
-  lower_bounds[constraint_index] = d_state[0];
+  lower_bounds[constraint_index] = d_state[0]; ///< l
   upper_bounds[constraint_index] = d_state[0];
   ++constraint_index;
 
-  columns[prime_offset].emplace_back(constraint_index, 1.0);
-  lower_bounds[constraint_index] = d_state[1];
+  columns[prime_offset].emplace_back(constraint_index, 1.0); ///< prime_offset = 60
+  lower_bounds[constraint_index] = d_state[1]; ///< l_d
   upper_bounds[constraint_index] = d_state[1];
   ++constraint_index;
 
-  columns[pprime_offset].emplace_back(constraint_index, 1.0);
-  lower_bounds[constraint_index] = d_state[2];
+  columns[pprime_offset].emplace_back(constraint_index, 1.0); ///< pprime_offset = 120
+  lower_bounds[constraint_index] = d_state[2]; ///< l_dd
   upper_bounds[constraint_index] = d_state[2];
   ++constraint_index;
 
@@ -104,10 +105,10 @@ bool LateralOSQPOptimizer::optimize(
   for (int i = 0; i < kNumParam; ++i) {
     columns[i].emplace_back(constraint_index, 1.0);
     if (i < num_var) {
-      lower_bounds[constraint_index] = d_bounds[i].first;
-      upper_bounds[constraint_index] = d_bounds[i].second;
+      lower_bounds[constraint_index] = d_bounds[i].first; ///< 下边界
+      upper_bounds[constraint_index] = d_bounds[i].second; ///< 上边界
     } else {
-      lower_bounds[constraint_index] = -LARGE_VALUE;
+      lower_bounds[constraint_index] = -LARGE_VALUE; ///< -2,2作为缺省值不充值，凑够矩阵运算数量
       upper_bounds[constraint_index] = LARGE_VALUE;
     }
     ++constraint_index;
@@ -116,9 +117,9 @@ bool LateralOSQPOptimizer::optimize(
   CHECK_EQ(constraint_index, kNumConstraint);
 
   // change affine_constraint to CSC format
-  std::vector<c_float> A_data;
-  std::vector<c_int> A_indices;
-  std::vector<c_int> A_indptr;
+  std::vector<c_float> A_data; ///< 非零的数据
+  std::vector<c_int> A_indices; ///< 非0元素对应的行
+  std::vector<c_int> A_indptr; ///< 稀疏矩阵中表示非0元素几个
   int ind_p = 0;
   for (int j = 0; j < kNumParam; ++j) {
     A_indptr.push_back(ind_p);
@@ -132,7 +133,7 @@ bool LateralOSQPOptimizer::optimize(
 
   // offset
   double q[kNumParam];
-  for (int i = 0; i < kNumParam; ++i) {
+  for (int i = 0; i < kNumParam; ++i) { ///< 180
     if (i < num_var) {
       q[i] = -2.0 * FLAGS_weight_lateral_obstacle_distance *
              (d_bounds[i].first + d_bounds[i].second);
@@ -141,23 +142,23 @@ bool LateralOSQPOptimizer::optimize(
     }
   }
 
-  // Problem settings
+  // Problem settings动态分配内存来创建一个 OSQPSettings 类型的对象，返回指向该对象的指针
   OSQPSettings* settings =
-      reinterpret_cast<OSQPSettings*>(c_malloc(sizeof(OSQPSettings)));
+      reinterpret_cast<OSQPSettings*>(c_malloc(sizeof(OSQPSettings)));///< reinterpret_cast 用于强制类型转换
 
   // Define Solver settings as default
   osqp_set_default_settings(settings);
-  settings->alpha = 1.0;  // Change alpha parameter
-  settings->eps_abs = 1.0e-05;
-  settings->eps_rel = 1.0e-05;
-  settings->max_iter = 5000;
-  settings->polish = true;
-  settings->verbose = FLAGS_enable_osqp_debug;
+  settings->alpha = 1.0;  ///< 影响求解器的收敛速度和稳定性
+  settings->eps_abs = 1.0e-05;///<绝对精度,终止条件
+  settings->eps_rel = 1.0e-05;///<相对精度,终止条件
+  settings->max_iter = 5000; ///<最大迭代次数
+  settings->polish = true;///< 是否在求解结束后进行额外的步骤来提高解的精度
+  settings->verbose = FLAGS_enable_osqp_debug; ///<false 决定了 OSQP 求解器是否输出详细的调试信息
 
   // Populate data
   OSQPData* data = reinterpret_cast<OSQPData*>(c_malloc(sizeof(OSQPData)));
-  data->n = kNumParam;
-  data->m = kNumConstraint;
+  data->n = kNumParam; ///< 180
+  data->m = kNumConstraint; ///< 360
   data->P = csc_matrix(data->n, data->n, P_data.size(), P_data.data(),
                        P_indices.data(), P_indptr.data());
   data->q = q;
@@ -167,9 +168,9 @@ bool LateralOSQPOptimizer::optimize(
   data->u = upper_bounds;
 
   // Workspace
-  OSQPWorkspace* work = nullptr;
+  OSQPWorkspace* work = nullptr;///<定义了一个指向 OSQPWorkspace 类型的指针 work，并将其初始化为 nullptr
   // osqp_setup(&work, data, settings);
-  work = osqp_setup(data, settings);
+  work = osqp_setup(data, settings);///< 为求解器分配内存并初始化求解器
 
   // Solve Problem
   osqp_solve(work);
@@ -184,7 +185,7 @@ bool LateralOSQPOptimizer::optimize(
   opt_d_pprime_[num_var - 1] = 0.0;
 
   // Cleanup
-  osqp_cleanup(work);
+  osqp_cleanup(work); ///< 释放内存
   c_free(data->A);
   c_free(data->P);
   c_free(data);
@@ -192,24 +193,29 @@ bool LateralOSQPOptimizer::optimize(
 
   return true;
 }
-
+/// @brief 也就是算P
+/// @param d_bounds 
+/// @param P_data 
+/// @param P_indices 
+/// @param P_indptr 
+///使用的是csc_matrix，压速CSC 
 void LateralOSQPOptimizer::CalculateKernel(
     const std::vector<std::pair<double, double>>& d_bounds,
     std::vector<c_float>* P_data, std::vector<c_int>* P_indices,
     std::vector<c_int>* P_indptr) {
-  const int kNumParam = 3 * static_cast<int>(d_bounds.size());
-  P_data->resize(kNumParam);
+  const int kNumParam = 3 * static_cast<int>(d_bounds.size());///< 3* 60
+  P_data->resize(kNumParam); ///<权重
   P_indices->resize(kNumParam);
   P_indptr->resize(kNumParam + 1);
-
+ ///状态量就是前60维是l,再60维是l_d，再60维是l_dd
   for (int i = 0; i < kNumParam; ++i) {
     if (i < static_cast<int>(d_bounds.size())) {
       P_data->at(i) = 2.0 * FLAGS_weight_lateral_offset +
-                      2.0 * FLAGS_weight_lateral_obstacle_distance;
+                      2.0 * FLAGS_weight_lateral_obstacle_distance;///< 2* 1.0 + 2* 0
     } else if (i < 2 * static_cast<int>(d_bounds.size())) {
-      P_data->at(i) = 2.0 * FLAGS_weight_lateral_derivative;
+      P_data->at(i) = 2.0 * FLAGS_weight_lateral_derivative; ///< 2 * 500
     } else {
-      P_data->at(i) = 2.0 * FLAGS_weight_lateral_second_order_derivative;
+      P_data->at(i) = 2.0 * FLAGS_weight_lateral_second_order_derivative; ///< 2*1000
     }
     P_indices->at(i) = i;
     P_indptr->at(i) = i;
