@@ -102,7 +102,7 @@ bool LateralOSQPOptimizer::optimize(
   ++constraint_index;
 
   const double LARGE_VALUE = 2.0;
-  for (int i = 0; i < kNumParam; ++i) {
+  for (int i = 0; i < kNumParam; ++i) { ///< kNumParam = 180
     columns[i].emplace_back(constraint_index, 1.0);
     if (i < num_var) {
       lower_bounds[constraint_index] = d_bounds[i].first; ///< 下边界
