@@ -1,18 +1,3 @@
-/******************************************************************************
- * Copyright 2017 The Apollo Authors. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *****************************************************************************/
 
 #include "modules/planning/planning.h"
 
@@ -44,10 +29,11 @@ using apollo::common::time::Clock;
 std::string Planning::Name() const { return "planning"; }
 
 void Planning::RegisterPlanners() {
+  ///[]是捕获列表，这里没有捕获任何变量，()是参数列表，->返回值类型，{}是函数体
   planner_factory_.Register(
-      PlanningConfig::RTK, []() -> Planner* { return new RTKReplayPlanner(); });
+      PlanningConfig::RTK, []() -> Planner* { return new RTKReplayPlanner(); });///<返回RTKReplayPlanner对象的指针
   planner_factory_.Register(PlanningConfig::EM,
-                            []() -> Planner* { return new EMPlanner(); });
+                            []() -> Planner* { return new EMPlanner(); });///<返回EMPlanner对象的指针，lambda表达式
 }
 
 Status Planning::InitFrame(const uint32_t sequence_num, const double time_stamp,
