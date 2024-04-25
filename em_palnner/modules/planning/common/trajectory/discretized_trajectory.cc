@@ -78,7 +78,7 @@ TrajectoryPoint DiscretizedTrajectory::EvaluateUsingLinearApproximation(
 }
 
 std::uint32_t DiscretizedTrajectory::QueryNearestPoint(
-    const double relative_time) const {
+    const double relative_time) const { 
   CHECK(!trajectory_points_.empty());
 
   if (relative_time >= trajectory_points_.back().relative_time()) {

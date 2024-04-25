@@ -38,7 +38,7 @@ void Planning::RegisterPlanners() {
 
 Status Planning::InitFrame(const uint32_t sequence_num, const double time_stamp,
                            const TrajectoryPoint& init_adc_point) {
-  frame_.reset(new Frame(sequence_num));
+  frame_.reset(new Frame(sequence_num)); ///< 重置frame_
   frame_->SetPlanningStartPoint(init_adc_point);
 
   if (AdapterManager::GetRoutingResponse()->Empty()) {
@@ -52,7 +52,7 @@ Status Planning::InitFrame(const uint32_t sequence_num, const double time_stamp,
          << AdapterManager::GetRoutingResponse()
                 ->GetLatestObserved()
                 .DebugString();
-
+  /// enable_prediction = true
   if (FLAGS_enable_prediction && !AdapterManager::GetPrediction()->Empty()) {
     const auto& prediction =
         AdapterManager::GetPrediction()->GetLatestObserved();
@@ -198,20 +198,20 @@ void Planning::RunOnce() {
         AdapterManager::GetRoutingResponse()->GetLatestObserved());
   }
 
-  const double planning_cycle_time = 1.0 / FLAGS_planning_loop_rate;
+  const double planning_cycle_time = 1.0 / FLAGS_planning_loop_rate; ///<规划周期时间 1/10
 
-  bool is_auto_mode = chassis.driving_mode() == chassis.COMPLETE_AUTO_DRIVE;
+  bool is_auto_mode = chassis.driving_mode() == chassis.COMPLETE_AUTO_DRIVE; ///<是否是自动驾驶模式
   const auto& stitching_trajectory =
       TrajectoryStitcher::ComputeStitchingTrajectory(
           is_auto_mode, start_timestamp, planning_cycle_time,
-          last_publishable_trajectory_);
+          last_publishable_trajectory_); ///< 计算拼接轨迹
 
-  const uint32_t frame_num = AdapterManager::GetPlanning()->GetSeqNum() + 1;
-  status = InitFrame(frame_num, start_timestamp, stitching_trajectory.back());
+  const uint32_t frame_num = AdapterManager::GetPlanning()->GetSeqNum() + 1; ///< 单调递增的帧编号
+  status = InitFrame(frame_num, start_timestamp, stitching_trajectory.back());///< 初始化帧
   double end_timestamp = Clock::NowInSecond();
-  double time_diff_ms = (end_timestamp - start_timestamp) * 1000;
-  auto trajectory_pb = frame_->MutableADCTrajectory();
-  trajectory_pb->mutable_latency_stats()->set_init_frame_time_ms(time_diff_ms);
+  double time_diff_ms = (end_timestamp - start_timestamp) * 1000; ///<时间差
+  auto trajectory_pb = frame_->MutableADCTrajectory();///< 获取ADCTrajectory
+  trajectory_pb->mutable_latency_stats()->set_init_frame_time_ms(time_diff_ms); ///< 设置初始化帧时间,就是延迟时间
   if (!status.ok()) {
     ADCTrajectory estop;
     estop.mutable_estop();

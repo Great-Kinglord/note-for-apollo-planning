@@ -71,7 +71,7 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
     return ComputeReinitStitchingTrajectory();
   }
 
-  std::size_t prev_trajectory_size = prev_trajectory.NumOfPoints();
+  std::size_t prev_trajectory_size = prev_trajectory.NumOfPoints(); ///< 上一次轨迹的点数
 
   if (prev_trajectory_size == 0) {
     AWARN << "Projected trajectory at time [" << prev_trajectory.header_time()
@@ -80,9 +80,9 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
     return ComputeReinitStitchingTrajectory();
   }
 
-  const double veh_rel_time = current_timestamp - prev_trajectory.header_time();
+  const double veh_rel_time = current_timestamp - prev_trajectory.header_time();///< 当前时间戳减去上一次规划的时间戳
 
-  std::size_t matched_index = prev_trajectory.QueryNearestPoint(veh_rel_time);
+  std::size_t matched_index = prev_trajectory.QueryNearestPoint(veh_rel_time); ///< 按照相对时间去查询在上一次轨迹中对应的点的索引
 
   if (matched_index == prev_trajectory_size) {
     AWARN << "The previous trajectory is not long enough, something is wrong";
@@ -99,9 +99,9 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
   auto matched_point = prev_trajectory.TrajectoryPointAt(matched_index);
   const double position_diff =
       std::hypot(matched_point.path_point().x() - vehicle_state.x(),
-                 matched_point.path_point().y() - vehicle_state.y());
+                 matched_point.path_point().y() - vehicle_state.y()); ///< 计算匹配点和实际位置的距离
 
-  if (position_diff > FLAGS_replan_distance_threshold) {
+  if (position_diff > FLAGS_replan_distance_threshold) {///< 如果距离过大，重新规划 > 5m
     AWARN << "the distance between matched point and actual position is too "
              "large";
     return ComputeReinitStitchingTrajectory();
@@ -113,7 +113,7 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
 
   std::vector<TrajectoryPoint> stitching_trajectory(
       prev_trajectory.trajectory_points().begin() + matched_index,
-      prev_trajectory.trajectory_points().begin() + forward_index + 1);
+      prev_trajectory.trajectory_points().begin() + forward_index + 1);///< 
 
   const double zero_time = veh_rel_time;
   const double zero_s =
