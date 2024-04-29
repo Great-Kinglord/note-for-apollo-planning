@@ -23,7 +23,7 @@
 
 namespace apollo {
 namespace planning {
-
+/// @brief 后面新的apollo代码会增加更多的交通规则
 BackSideVehicles::BackSideVehicles() : TrafficRule("BackSideVehicles") {}
 
 bool BackSideVehicles::ApplyRule(ReferenceLineInfo* const reference_line_info) {
@@ -33,17 +33,17 @@ bool BackSideVehicles::ApplyRule(ReferenceLineInfo* const reference_line_info) {
   ignore.mutable_ignore();
   for (const auto* path_obstacle : path_decision->path_obstacles().Items()) {
     if (path_obstacle->perception_sl_boundary().end_s() >=
-        adc_sl_boundary.end_s()) {
+        adc_sl_boundary.end_s()) {///< 忽略前方障碍物,主要是太远了
       continue;
     }
 
-    if (path_obstacle->st_boundary().IsEmpty()) {
+    if (path_obstacle->st_boundary().IsEmpty()) {///< 参考线上没有障碍物轨迹，则忽略，应该是静止物体
       path_decision->AddLongitudinalDecision(Name(), path_obstacle->Id(),
                                              ignore);
       path_decision->AddLateralDecision(Name(), path_obstacle->Id(), ignore);
       continue;
     }
-    if (path_obstacle->st_boundary().min_s() < 0) {
+    if (path_obstacle->st_boundary().min_s() < 0) {///< 障碍物轨迹距离无人车的最近距离小于0,则忽略
       path_decision->AddLongitudinalDecision(Name(), path_obstacle->Id(),
                                              ignore);
       path_decision->AddLateralDecision(Name(), path_obstacle->Id(), ignore);

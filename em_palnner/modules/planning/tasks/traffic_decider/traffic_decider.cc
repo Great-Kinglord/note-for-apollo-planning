@@ -28,18 +28,19 @@ namespace apollo {
 namespace planning {
 using common::Status;
 using common::VehicleConfigHelper;
-
+/// 在对后向来车的处理决策中,会对path_decision中的每一个障碍物进行遍历,在遍历时,如果是后向车辆,则选择忽略,
+/// 即通过调用函数PathDecision::AddLongitudinalDecision()和函数PathDecision::AddLateralDecision()为障碍物打上"ignore”的标签
 TrafficDecider::TrafficDecider() : Task("TrafficDecider") {}
-
+/// @brief 注册交通规则-后向来车
 void TrafficDecider::RegisterRules() {
   rule_factory_.Register("BackSideVehicles", []() -> TrafficRule * {
-    return new BackSideVehicles();
+    return new BackSideVehicles();///< 返回对象的指针
   });
 }
 
 bool TrafficDecider::Init(const PlanningConfig &config) {
   RegisterRules();
-  rule_configs_ = config.rule_config();
+  rule_configs_ = config.rule_config(); ///< rule_config = 4
   is_init_ = true;
   return true;
 }
@@ -47,7 +48,7 @@ bool TrafficDecider::Init(const PlanningConfig &config) {
 Status TrafficDecider::Execute(Frame *frame,
                                ReferenceLineInfo *reference_line_info) {
   Task::Execute(frame, reference_line_info);
-
+ ///当前只有一个交通规则-后向来车
   for (const auto rule_config : rule_configs_) {
     auto rule = rule_factory_.CreateObject(rule_config.name());
     if (!rule) {

@@ -33,12 +33,13 @@ namespace planning {
 
 using apollo::common::ErrorCode;
 using apollo::common::Status;
+/// @brief 路径规划DP
 
 DpPolyPathOptimizer::DpPolyPathOptimizer()
     : PathOptimizer("DpPolyPathOptimizer") {}
 
 bool DpPolyPathOptimizer::Init(const PlanningConfig &config) {
-  config_ = config.em_planner_config().dp_poly_path_config();
+  config_ = config.em_planner_config().dp_poly_path_config(); ///<载入config
   is_init_ = true;
   return true;
 }

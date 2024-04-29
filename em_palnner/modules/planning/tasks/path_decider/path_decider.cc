@@ -36,7 +36,7 @@ namespace planning {
 
 using apollo::common::ErrorCode;
 using apollo::common::Status;
-
+/// @brief 根据选出的路径给出对静态障碍物的决策，动态在速度动态规划那
 PathDecider::PathDecider() : Task("PathDecider") {}
 
 apollo::common::Status PathDecider::Execute(
@@ -79,16 +79,17 @@ bool PathDecider::MakeStaticObstacleDecision(
   const double half_width =
       common::VehicleConfigHelper::GetConfig().vehicle_param().width() / 2.0;
 
-  const double lateral_radius = half_width + FLAGS_lateral_ignore_buffer;
+  const double lateral_radius = half_width + FLAGS_lateral_ignore_buffer; ///< 需要偏移下 半个车宽+2m
 
   const double lateral_stop_radius =
-      half_width + FLAGS_static_decision_nudge_l_buffer;
+      half_width + FLAGS_static_decision_nudge_l_buffer; ///< 需要停止 半个车宽+0.5m
 
   for (const auto *path_obstacle : path_decision->path_obstacles().Items()) {
     const auto &obstacle = *path_obstacle->obstacle();
-    if (!obstacle.IsStatic()) {
+    if (!obstacle.IsStatic()) { ///< 静态障碍物,不是的跳过
       continue;
     }
+    /// 如果障碍物的决策中有忽略的决策,则跳过
     if (path_obstacle->HasLongitudinalDecision() &&
         path_obstacle->LongitudinalDecision().has_ignore() &&
         path_obstacle->HasLateralDecision() &&
@@ -99,7 +100,7 @@ bool PathDecider::MakeStaticObstacleDecision(
     // IGNORE by default
     ObjectDecisionType object_decision;
     object_decision.mutable_ignore();
-
+    ///
     const auto &sl_boundary = path_obstacle->perception_sl_boundary();
     if (sl_boundary.start_s() < frenet_points.front().s() ||
         sl_boundary.start_s() > frenet_points.back().s()) {
@@ -112,27 +113,30 @@ bool PathDecider::MakeStaticObstacleDecision(
     const double curr_l = frenet_point.l();
     if (curr_l - lateral_radius > sl_boundary.end_l() ||
         curr_l + lateral_radius < sl_boundary.start_l()) {
-      // ignore
+      /// ignore,距离太远，忽略
       path_decision->AddLateralDecision("PathDecider", obstacle.Id(),
                                         object_decision);
     } else if (curr_l - lateral_stop_radius < sl_boundary.end_l() &&
                curr_l + lateral_stop_radius > sl_boundary.start_l()) {
+      /// 距离太近，需要停车
       *object_decision.mutable_stop() =
           GenerateObjectStopDecision(*path_obstacle);
       path_decision->AddLongitudinalDecision("PathDecider", obstacle.Id(),
                                              object_decision);
     } else if (FLAGS_enable_nudge_decision &&
                (curr_l - lateral_stop_radius > sl_boundary.end_l())) {
+      /// 需要左移
       ObjectNudge *object_nudge_ptr = object_decision.mutable_nudge();
       object_nudge_ptr->set_type(ObjectNudge::LEFT_NUDGE);
-      object_nudge_ptr->set_distance_l(FLAGS_nudge_distance_obstacle);
+      object_nudge_ptr->set_distance_l(FLAGS_nudge_distance_obstacle); ///< 左移0.3m
       path_decision->AddLateralDecision("PathDecider", obstacle.Id(),
                                         object_decision);
     } else {
       if (FLAGS_enable_nudge_decision) {
+        /// 需要右移
         ObjectNudge *object_nudge_ptr = object_decision.mutable_nudge();
         object_nudge_ptr->set_type(ObjectNudge::RIGHT_NUDGE);
-        object_nudge_ptr->set_distance_l(-FLAGS_nudge_distance_obstacle);
+        object_nudge_ptr->set_distance_l(-FLAGS_nudge_distance_obstacle); ///< 右移0.3m
         path_decision->AddLateralDecision("PathDecider", obstacle.Id(),
                                           object_decision);
       }

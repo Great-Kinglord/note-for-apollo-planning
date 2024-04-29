@@ -44,10 +44,10 @@ TrajectoryCost::TrajectoryCost(
       vehicle_param_(vehicle_param),
       heuristic_speed_data_(heuristic_speed_data) {
   const double total_time =
-      std::min(heuristic_speed_data_.TotalTime(), FLAGS_prediction_total_time);
+      std::min(heuristic_speed_data_.TotalTime(), FLAGS_prediction_total_time);///< prediction_total_time = 5s
 
   num_of_time_stamps_ = static_cast<uint32_t>(
-      std::floor(total_time / config.eval_time_interval()));
+      std::floor(total_time / config.eval_time_interval()));///< eval_time_interval = 0.1s
 
   for (const auto ptr_path_obstacle : obstacles) {
     if (ptr_path_obstacle->IsIgnore()) {
@@ -65,7 +65,7 @@ TrajectoryCost::TrajectoryCost(
       Box2d obstacle_box = ptr_obstacle->GetBoundingBox(trajectory_point);
       box_by_time.push_back(obstacle_box);
     }
-    obstacle_boxes_.push_back(box_by_time);
+    obstacle_boxes_.push_back(box_by_time); ///<把障碍物的box信息存储到obstacle_boxes_中
   }
 }
 

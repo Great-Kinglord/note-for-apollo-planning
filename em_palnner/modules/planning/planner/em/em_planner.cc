@@ -73,8 +73,8 @@ Status EMPlanner::Init(const PlanningConfig& config) {
   RegisterTasks();
   for (const auto task : config.em_planner_config().task()) {
     tasks_.emplace_back(
-        task_factory_.CreateObject(static_cast<TaskType>(task)));
-    AINFO << "Created task:" << tasks_.back()->Name();
+        task_factory_.CreateObject(static_cast<TaskType>(task))); ///<顺序 TrafficDecider DpPolyPathOptimizer PathDecider DpStSpeedOptimizer 
+    AINFO << "Created task:" << tasks_.back()->Name();            ///< QpSplinePathOptimizer  QpSplineStSpeedOptimizer
   }
   for (auto& task : tasks_) {
     if (!task->Init(config)) {
@@ -120,7 +120,7 @@ Status EMPlanner::Plan(const TrajectoryPoint& planning_start_point,
     speed_profile = GenerateSpeedHotStart(planning_start_point);
     ADEBUG << "Using dummy hot start for speed vector";
   }
-  heuristic_speed_data->set_speed_vector(speed_profile);
+  heuristic_speed_data->set_speed_vector(speed_profile); ///<启发式速度数据
 
   auto ptr_debug = reference_line_info->mutable_debug();
   auto ptr_latency_stats = reference_line_info->mutable_latency_stats();
@@ -228,14 +228,15 @@ std::vector<SpeedPoint> EMPlanner::GenerateInitSpeedProfile(
 }
 
 // This is a dummy simple hot start, need refine later
+///这是一个虚拟简单的热启动，需要后期完善
 std::vector<SpeedPoint> EMPlanner::GenerateSpeedHotStart(
     const TrajectoryPoint& planning_init_point) {
   std::vector<SpeedPoint> hot_start_speed_profile;
   double s = 0.0;
   double t = 0.0;
   double v = common::math::Clamp(planning_init_point.v(), 5.0,
-                                 FLAGS_planning_upper_speed_limit);
-  while (t < FLAGS_trajectory_time_length) {
+                                 FLAGS_planning_upper_speed_limit); ///< 上限12.5m/s
+  while (t < FLAGS_trajectory_time_length) { ///< 8s
     SpeedPoint speed_point;
     speed_point.set_s(s);
     speed_point.set_t(t);
@@ -243,7 +244,7 @@ std::vector<SpeedPoint> EMPlanner::GenerateSpeedHotStart(
 
     hot_start_speed_profile.push_back(std::move(speed_point));
 
-    t += FLAGS_trajectory_time_resolution;
+    t += FLAGS_trajectory_time_resolution; ///< 0.1s
     s += v * FLAGS_trajectory_time_resolution;
   }
   return hot_start_speed_profile;

@@ -57,6 +57,7 @@ bool DPRoadGraph::FindPathTunnel(
     PathData *const path_data) {
   CHECK_NOTNULL(path_data);
   init_point_ = init_point;
+  /// 把车辆起始的位置转换为SL坐标系
   if (!reference_line_.XYToSL(
           {init_point_.path_point().x(), init_point_.path_point().y()},
           &init_sl_point_)) {
@@ -100,18 +101,22 @@ bool DPRoadGraph::FindPathTunnel(
   return true;
 }
 
+/// @brief  获取当前参考线下最优的前进路线
+/// @param obstacles 
+/// @param min_cost_path 
+/// @return 
 bool DPRoadGraph::GenerateMinCostPath(
     const std::vector<const PathObstacle *> &obstacles,
     std::vector<DPRoadGraphNode> *min_cost_path) {
   CHECK(min_cost_path != nullptr);
 
   std::vector<std::vector<common::SLPoint>> path_waypoints;
-  if (!SamplePathWaypoints(init_point_, &path_waypoints)) {
+  if (!SamplePathWaypoints(init_point_, &path_waypoints)) { ///< 采样路径点
     AERROR << "Fail to sample path waypoints!";
     return false;
   }
   path_waypoints.insert(path_waypoints.begin(),
-                        std::vector<common::SLPoint>{init_sl_point_});
+                        std::vector<common::SLPoint>{init_sl_point_});///< 插入起始点
 
   const auto &vehicle_config =
       common::VehicleConfigHelper::instance()->GetConfig();
@@ -163,7 +168,7 @@ bool DPRoadGraph::SamplePathWaypoints(
   CHECK(points != nullptr);
 
   common::math::Vec2d init_cartesian_point(init_point.path_point().x(),
-                                           init_point.path_point().y());
+                                           init_point.path_point().y()); ///< 车辆起始位置
   common::SLPoint init_sl_point;
   if (!reference_line_.XYToSL(init_cartesian_point, &init_sl_point)) {
     AERROR << "Failed to get sl point from point "
@@ -172,25 +177,26 @@ bool DPRoadGraph::SamplePathWaypoints(
   }
 
   const double reference_line_length =
-      reference_line_.map_path().accumulated_s().back();
+      reference_line_.map_path().accumulated_s().back(); ///< 参考线长度
 
   double level_distance =
       std::fmax(config_.step_length_min(),
-                std::fmin(init_point.v(), config_.step_length_max()));
+                std::fmin(init_point.v(), config_.step_length_max())); ///< 8.0 min(spd,15)
 
   double accumulated_s = init_sl_point.s();
   for (std::size_t i = 0;
        i < config_.sample_level() && accumulated_s < reference_line_length;
        ++i) {
+      /// sample_level默认为8
     std::vector<common::SLPoint> level_points;
     accumulated_s += level_distance;
     double s = std::fmin(accumulated_s, reference_line_length);
 
     int32_t num =
-        static_cast<int32_t>(config_.sample_points_num_each_level() / 2);
+        static_cast<int32_t>(config_.sample_points_num_each_level() / 2); ///< 9/2=4
 
-    for (int32_t j = -num; j < num + 1; ++j) {
-      double l = config_.lateral_sample_offset() * j;
+    for (int32_t j = -num; j < num + 1; ++j) {/// -4, -3, -2, -1, 0, 1, 2, 3, 4
+      double l = config_.lateral_sample_offset() * j; ///< 0.5*j   -2~2
       auto sl = common::util::MakeSLPoint(s, l);
       if (reference_line_.IsOnRoad(sl)) {
         level_points.push_back(sl);
