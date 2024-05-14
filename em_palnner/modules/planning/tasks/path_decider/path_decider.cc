@@ -49,6 +49,7 @@ apollo::common::Status PathDecider::Execute(
 Status PathDecider::Process(const PathData &path_data,
                             PathDecision *const path_decision) {
   CHECK_NOTNULL(path_decision);
+  ///基于DP后的路径进行决策
   if (!MakeObjectDecision(path_data, path_decision)) {
     AERROR << "Failed to make decision based on tunnel";
     return Status(ErrorCode::PLANNING_ERROR, "dp_road_graph decision ");
@@ -65,7 +66,10 @@ bool PathDecider::MakeObjectDecision(const PathData &path_data,
   }
   return true;
 }
-
+/// @brief 对静态目标进行决策
+/// @param path_data 
+/// @param path_decision 
+/// @return 
 bool PathDecider::MakeStaticObstacleDecision(
     const PathData &path_data, PathDecision *const path_decision) {
   DCHECK_NOTNULL(path_decision);

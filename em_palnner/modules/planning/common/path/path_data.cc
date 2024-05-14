@@ -60,6 +60,7 @@ bool PathData::SetFrenetPath(const FrenetFramePath &frenet_path) {
     return false;
   }
   frenet_path_ = frenet_path;
+  ///把frenet坐标系转为笛卡尔坐标系
   if (!SLToXY(frenet_path_, &discretized_path_)) {
     AERROR << "Fail to transfer frenet path to discretized path.";
     return false;

@@ -74,20 +74,20 @@ bool DPRoadGraph::FindPathTunnel(
   std::vector<common::FrenetFramePoint> frenet_path;
   double accumulated_s = init_sl_point_.s();
   const double path_resolution = config_.path_resolution();///< 0.1
-
+  ///每一段曲线，以0.1去采样
   for (std::size_t i = 1; i < min_cost_path.size(); ++i) {
     const auto &prev_node = min_cost_path[i - 1];
     const auto &cur_node = min_cost_path[i];
-
-    const double path_length = cur_node.sl_point.s() - prev_node.sl_point.s();
+    ///！要记得五次多项式，不是根据实际s_pre，和s之间的曲线，而是平移到0到s-s_pre上，对于l是没有影响的
+    const double path_length = cur_node.sl_point.s() - prev_node.sl_point.s();///<这两点的s距离
     double current_s = 0.0;
     const auto &curve = cur_node.min_cost_curve;
-    while (Double::Compare(current_s, path_length) < 0.0) {
+    while (Double::Compare(current_s, path_length) < 0.0) {///<从小于这段长度去采样
       const double l = curve.Evaluate(0, current_s);
       const double dl = curve.Evaluate(1, current_s);
       const double ddl = curve.Evaluate(2, current_s);
       common::FrenetFramePoint frenet_frame_point;
-      frenet_frame_point.set_s(accumulated_s + current_s);
+      frenet_frame_point.set_s(accumulated_s + current_s);///!这里就能对应上了
       frenet_frame_point.set_l(l);
       frenet_frame_point.set_dl(dl);
       frenet_frame_point.set_ddl(ddl);
@@ -96,9 +96,9 @@ bool DPRoadGraph::FindPathTunnel(
     }
     accumulated_s += path_length;
   }
-  FrenetFramePath tunnel(frenet_path);
-  path_data->SetReferenceLine(&reference_line_);
-  path_data->SetFrenetPath(tunnel);
+  FrenetFramePath tunnel(frenet_path);///<frenet_path中已经包含了上面找出的路径
+  path_data->SetReferenceLine(&reference_line_);///<把参考线放进来
+  path_data->SetFrenetPath(tunnel);///<把tunnel放进来
   return true;
 }
 
