@@ -55,21 +55,24 @@ LineSegment2d::LineSegment2d(const Vec2d &start, const Vec2d &end)
 double LineSegment2d::length() const { return length_; }
 
 double LineSegment2d::length_sqr() const { return length_ * length_; }
-
+/// @brief 计算点到线段的最短距离
+/// @param point 
+/// @return 
 double LineSegment2d::DistanceTo(const Vec2d &point) const {
   if (length_ <= kMathEpsilon) {
-    return point.DistanceTo(start_);
+    ///长度很小那么该线段只是一个点，计算两点之间的距离即可。
+    return point.DistanceTo(start_);///<直接到start点的距离
   }
   const double x0 = point.x() - start_.x();
   const double y0 = point.y() - start_.y();
-  const double proj = x0 * unit_direction_.x() + y0 * unit_direction_.y();
+  const double proj = x0 * unit_direction_.x() + y0 * unit_direction_.y();///<点乘，投影距离，和start和end点的单位向量的点乘
   if (proj <= 0.0) {
-    return hypot(x0, y0);
+    return hypot(x0, y0);///< 欧氏距离
   }
   if (proj >= length_) {
     return point.DistanceTo(end_);
   }
-  return std::abs(x0 * unit_direction_.y() - y0 * unit_direction_.x());
+  return std::abs(x0 * unit_direction_.y() - y0 * unit_direction_.x());///<叉乘得到垂直距离
 }
 
 double LineSegment2d::DistanceTo(const Vec2d &point,

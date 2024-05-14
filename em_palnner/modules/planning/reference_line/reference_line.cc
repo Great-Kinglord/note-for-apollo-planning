@@ -67,9 +67,12 @@ ReferenceLine::ReferenceLine(
       map_path_(MapPath(std::vector<hdmap::MapPathPoint>(
                             reference_points.begin(), reference_points.end()),
                         lane_segments, max_approximation_error)) {}
-
+/// @brief 
+/// @param s 
+/// @return 返回是一个ReferencePoint对象
 ReferencePoint ReferenceLine::GetReferencePoint(const double s) const {
   const auto& accumulated_s = map_path_.accumulated_s();
+  ///s点在参考线起点前面
   if (s < accumulated_s.front()) {
     AWARN << "The requested s is before the start point of the reference "
              "line; reference line starts at "
@@ -80,6 +83,7 @@ ReferencePoint ReferenceLine::GetReferencePoint(const double s) const {
     }
     return ref_point;
   }
+  ///s点在参考线终点后面
   if (s > accumulated_s.back()) {
     AWARN << "The requested s exceeds the reference line; reference line "
              "ends at "
@@ -90,9 +94,9 @@ ReferencePoint ReferenceLine::GetReferencePoint(const double s) const {
     }
     return ref_point;
   }
-
+  ///s点在参考线上
   auto it_lower =
-      std::lower_bound(accumulated_s.begin(), accumulated_s.end(), s);
+      std::lower_bound(accumulated_s.begin(), accumulated_s.end(), s);///< 第一个大于等于s的元素
   if (it_lower == accumulated_s.begin()) {
     return reference_points_.front();
   } else {
@@ -194,10 +198,18 @@ bool ReferenceLine::XYToSL(const common::math::Vec2d& xy_point,
   return true;
 }
 
+/// @brief 也是进行插值
+/// @param p0 前一个
+/// @param s0 
+/// @param p1 后一个
+/// @param s1 
+/// @param s 
+/// @return 
 ReferencePoint ReferenceLine::Interpolate(const ReferencePoint& p0,
                                           const double s0,
                                           const ReferencePoint& p1,
                                           const double s1, const double s) {
+  ///后一个点和前一个点的s相等
   if (std::fabs(s0 - s1) < common::math::kMathEpsilon) {
     return p0;
   }
@@ -206,6 +218,7 @@ ReferencePoint ReferenceLine::Interpolate(const ReferencePoint& p0,
 
   CHECK(!p0.lane_waypoints().empty());
   CHECK(!p1.lane_waypoints().empty());
+  ///进行线性插值
   const double x = common::math::lerp(p0.x(), s0, p1.x(), s1, s);
   const double y = common::math::lerp(p0.y(), s0, p1.y(), s1, s);
   const double heading =
@@ -247,18 +260,20 @@ bool ReferenceLine::GetLaneWidth(const double s, double* const left_width,
                                  double* const right_width) const {
   return map_path_.GetWidth(s, left_width, right_width);
 }
-
+/// @brief 
+/// @param sl_point 
+/// @return 
 bool ReferenceLine::IsOnRoad(const SLPoint& sl_point) const {
   if (sl_point.s() <= 0 || sl_point.s() > map_path_.length()) {
     return false;
   }
   double left_width = 0.0;
   double right_width = 0.0;
-
+  ///更具HDMap获取当前位置的左右车道宽度
   if (!GetLaneWidth(sl_point.s(), &left_width, &right_width)) {
     return false;
   }
-
+  ///判断当前位置是否在车道内
   if (sl_point.l() <= -right_width || sl_point.l() >= left_width) {
     return false;
   }

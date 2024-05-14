@@ -252,7 +252,7 @@ double Box2d::DistanceTo(const LineSegment2d &line_segment) const {
 }
 
 double Box2d::DistanceTo(const Box2d &box) const {
-  return Polygon2d(box).DistanceTo(*this);
+  return Polygon2d(box).DistanceTo(*this);///< 调用Polygon2d的DistanceTo函数
 }
 
 bool Box2d::HasOverlap(const Box2d &box) const {

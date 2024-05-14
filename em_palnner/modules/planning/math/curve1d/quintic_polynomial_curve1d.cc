@@ -100,6 +100,7 @@ void QuinticPolynomialCurve1d::compute_coefficients(
 
   // the direct analytical method is at least 6 times faster than using matrix
   // inversion.
+  ///直接解析法比使用矩阵求逆法快6倍
   double c0 = (x1 - 0.5 * p2 * ddx0 - dx0 * p - x0) / p3;
   double c1 = (dx1 - ddx0 * p - dx0) / p2;
   double c2 = (ddx1 - ddx0) / p;

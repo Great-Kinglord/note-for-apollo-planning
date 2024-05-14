@@ -50,9 +50,11 @@ double WrapAngle(const double angle) {
   const double new_angle = std::fmod(angle, M_PI * 2.0);
   return new_angle < 0 ? new_angle + M_PI * 2.0 : new_angle;
 }
-
+/// @brief 结果是在-3.14到3.14
+/// @param angle 
+/// @return 标准化的角度值
 double NormalizeAngle(const double angle) {
-  const double new_angle = std::fmod(angle + M_PI, M_PI * 2.0);
+  const double new_angle = std::fmod(angle + M_PI, M_PI * 2.0);///<取余数，比如angle为3.14，这里结果就是0
   return (new_angle < 0 ? new_angle + M_PI * 2.0 : new_angle) - M_PI;
 }
 

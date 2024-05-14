@@ -114,12 +114,14 @@ class LineSegment2d {
   double DistanceTo(const Vec2d &point) const;
 
   /**
-   * @brief Compute the shortest distance from a point on the line segment
+   * @brief 给定点到线段的最近距离
+   *        Compute the shortest distance from a point on the line segment
    *        to a point in 2-D, and get the nearest point on the line segment.
    * @param point The point to compute the distance to.
    * @param nearest_pt The nearest point on the line segment
    *        to the input point.
-   * @return The shortest ditance from points on the line segment
+   * @return 返回最近的点，给定点的垂线与原线段的交点
+   *          The shortest ditance from points on the line segment
    *         to the input point.
    */
   double DistanceTo(const Vec2d &point, Vec2d *const nearest_pt) const;

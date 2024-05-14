@@ -70,9 +70,10 @@ bool DPRoadGraph::FindPathTunnel(
     AERROR << "Fail to generate graph!";
     return false;
   }
+  ///上面步骤完成了寻找最小cost的path
   std::vector<common::FrenetFramePoint> frenet_path;
   double accumulated_s = init_sl_point_.s();
-  const double path_resolution = config_.path_resolution();
+  const double path_resolution = config_.path_resolution();///< 0.1
 
   for (std::size_t i = 1; i < min_cost_path.size(); ++i) {
     const auto &prev_node = min_cost_path[i - 1];
@@ -123,45 +124,54 @@ bool DPRoadGraph::GenerateMinCostPath(
 
   TrajectoryCost trajectory_cost(config_, reference_line_, obstacles,
                                  vehicle_config.vehicle_param(), speed_data_);
-
-  std::vector<std::vector<DPRoadGraphNode>> graph_nodes(path_waypoints.size());
-  graph_nodes[0].emplace_back(init_sl_point_, nullptr, 0.0);
-
+  ///为DP做准备
+  std::vector<std::vector<DPRoadGraphNode>> graph_nodes(path_waypoints.size());///< 二维vector，最外层的size为9应该
+  graph_nodes[0].emplace_back(init_sl_point_, nullptr, 0.0); ///< 第一个点，也就是车辆的起始点,第一层的vector是一维
+  /// 应该是从1到8，0已经在上面搞完了
   for (std::size_t level = 1; level < path_waypoints.size(); ++level) {
-    const auto &prev_dp_nodes = graph_nodes[level - 1];
-    const auto &level_points = path_waypoints[level];
-    for (const auto &cur_point : level_points) {
-      graph_nodes[level].emplace_back(cur_point, nullptr);
+    const auto &prev_dp_nodes = graph_nodes[level - 1];///<前一个快，就是一个s对应多个l
+    const auto &level_points = path_waypoints[level]; ///< 当前块，上一个s对应多个l
+    ///遍历当前块的每一个点，应该是循环9次
+    for (const auto &cur_point : level_points) {///< 遍历当前块的每一个点，也就是每一个l
+      graph_nodes[level].emplace_back(cur_point, nullptr); ///< 这里的nullptr是一个指针
       auto &cur_node = graph_nodes[level].back();
+      ///除了init，上一层中的9维，上一层和当前层一一连接
       for (const auto &prev_dp_node : prev_dp_nodes) {
         const auto &prev_sl_point = prev_dp_node.sl_point;
+        ///两个点之间使用五次多项式去连接，认为一阶导数和二阶导数都是0
         QuinticPolynomialCurve1d curve(prev_sl_point.l(), 0.0, 0.0,
                                        cur_point.l(), 0.0, 0.0,
                                        cur_point.s() - prev_sl_point.s());
         const double cost =
             trajectory_cost.Calculate(curve, prev_sl_point.s(), cur_point.s()) +
-            prev_dp_node.min_cost;
+            prev_dp_node.min_cost;///< 上一次mincost加上当前的cost
         cur_node.UpdateCost(&prev_dp_node, curve, cost);
       }
     }
   }
 
-  // find best path
+  ///找最优的路径，cost最小，可以指向前一个节点的指针一层层找回去
   DPRoadGraphNode fake_head;
+  ///最后一层中遍历所有的节点，找到最小的cost的节点信息给到fake_head
   for (const auto &cur_dp_node : graph_nodes.back()) {
     fake_head.UpdateCost(&cur_dp_node, cur_dp_node.min_cost_curve,
                          cur_dp_node.min_cost);
   }
 
   const auto *min_cost_node = &fake_head;
+  ///只要指针不为空就一直往前找
   while (min_cost_node->min_cost_prev_node) {
     min_cost_node = min_cost_node->min_cost_prev_node;
-    min_cost_path->push_back(*min_cost_node);
+    min_cost_path->push_back(*min_cost_node);///< ->操作符用于通过指针访问对象的成员
   }
+  ///使用std::reverse函数将min_cost_path中的元素顺序反转
   std::reverse(min_cost_path->begin(), min_cost_path->end());
   return true;
 }
-
+/// @brief 进行路径的采样
+/// @param init_point 
+/// @param points 
+/// @return 
 bool DPRoadGraph::SamplePathWaypoints(
     const common::TrajectoryPoint &init_point,
     std::vector<std::vector<common::SLPoint>> *const points) {
@@ -181,7 +191,7 @@ bool DPRoadGraph::SamplePathWaypoints(
 
   double level_distance =
       std::fmax(config_.step_length_min(),
-                std::fmin(init_point.v(), config_.step_length_max())); ///< 8.0 min(spd,15)
+                std::fmin(init_point.v(), config_.step_length_max())); ///< 8.0 min(spd,15) 不低于车辆1s中的行驶距离
 
   double accumulated_s = init_sl_point.s();
   for (std::size_t i = 0;

@@ -91,6 +91,9 @@ double Polygon2d::DistanceTo(const Box2d &box) const {
   return DistanceTo(Polygon2d(box));
 }
 
+/// @brief 
+/// @param polygon 
+/// @return 
 double Polygon2d::DistanceTo(const Polygon2d &polygon) const {
   CHECK_GE(points_.size(), 3);
   CHECK_GE(polygon.num_points(), 3);

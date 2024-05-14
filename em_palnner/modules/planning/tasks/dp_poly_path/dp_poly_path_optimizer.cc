@@ -53,6 +53,7 @@ Status DpPolyPathOptimizer::Process(const SpeedData &speed_data,
     return Status(ErrorCode::PLANNING_ERROR, "Not inited.");
   }
   CHECK_NOTNULL(path_data);
+  
   DPRoadGraph dp_road_graph(config_, reference_line, speed_data);
   if (!dp_road_graph.FindPathTunnel(
           init_point,

@@ -115,7 +115,7 @@ Status EMPlanner::Plan(const TrajectoryPoint& planning_start_point,
   ADEBUG << "planning start point:" << planning_start_point.DebugString();
   auto* heuristic_speed_data = reference_line_info->mutable_speed_data();
   auto speed_profile =
-      GenerateInitSpeedProfile(planning_start_point, reference_line_info);
+      GenerateInitSpeedProfile(planning_start_point, reference_line_info); ///< 生成初始速度曲线
   if (speed_profile.empty()) {
     speed_profile = GenerateSpeedHotStart(planning_start_point);
     ADEBUG << "Using dummy hot start for speed vector";
@@ -136,14 +136,6 @@ Status EMPlanner::Plan(const TrajectoryPoint& planning_start_point,
     const double end_timestamp = Clock::NowInSecond();
     const double time_diff_ms = (end_timestamp - start_timestamp) * 1000;
 
-    ADEBUG << "after optimizer " << optimizer->Name() << ":"
-           << reference_line_info->PathSpeedDebugString() << std::endl;
-    ADEBUG << optimizer->Name() << " time spend: " << time_diff_ms << " ms.";
-
-    if (FLAGS_enable_record_debug && ptr_debug != nullptr &&
-        ptr_latency_stats != nullptr) {
-      RecordDebugInfo(optimizer->Name(), time_diff_ms, ptr_latency_stats);
-    }
   }
   DiscretizedTrajectory trajectory;
   if (!reference_line_info->CombinePathAndSpeedProfile(
@@ -164,17 +156,21 @@ Status EMPlanner::Plan(const TrajectoryPoint& planning_start_point,
   return ret;
 }
 
+/// @brief 
+/// @param planning_init_point 
+/// @param reference_line_info 
+/// @return 
 std::vector<SpeedPoint> EMPlanner::GenerateInitSpeedProfile(
     const TrajectoryPoint& planning_init_point,
     const ReferenceLineInfo* reference_line_info) {
   std::vector<SpeedPoint> speed_profile;
-  const auto* last_frame = FrameHistory::instance()->Latest();
+  const auto* last_frame = FrameHistory::instance()->Latest(); ///< 上一帧的数据
   if (!last_frame) {
     AWARN << "last frame is empty";
     return speed_profile;
   }
   const ReferenceLineInfo* last_reference_line_info =
-      last_frame->DriveReferenceLinfInfo();
+      last_frame->DriveReferenceLinfInfo();///< 上一帧的参考线信息
   if (!last_reference_line_info) {
     ADEBUG << "last reference line info is empty";
     return speed_profile;
@@ -184,7 +180,7 @@ std::vector<SpeedPoint> EMPlanner::GenerateInitSpeedProfile(
     return speed_profile;
   }
   const auto& last_speed_vector =
-      last_reference_line_info->speed_data().speed_vector();
+      last_reference_line_info->speed_data().speed_vector(); ///< 上一帧的速度曲线
 
   if (!last_speed_vector.empty()) {
     const auto& last_init_point = last_frame->PlanningStartPoint().path_point();
@@ -235,7 +231,7 @@ std::vector<SpeedPoint> EMPlanner::GenerateSpeedHotStart(
   double s = 0.0;
   double t = 0.0;
   double v = common::math::Clamp(planning_init_point.v(), 5.0,
-                                 FLAGS_planning_upper_speed_limit); ///< 上限12.5m/s
+                                 FLAGS_planning_upper_speed_limit); ///< 上限12.5m/s，45kph
   while (t < FLAGS_trajectory_time_length) { ///< 8s
     SpeedPoint speed_point;
     speed_point.set_s(s);

@@ -70,6 +70,10 @@ class DPRoadGraph {
                     const DPRoadGraphNode *node_prev, const double cost)
         : sl_point(point_sl), min_cost_prev_node(node_prev), min_cost(cost) {}
 
+    /// @brief 更新cost
+    /// @param node_prev 指向前一个节点的指针
+    /// @param curve 
+    /// @param cost 
     void UpdateCost(const DPRoadGraphNode *node_prev,
                     const QuinticPolynomialCurve1d &curve, const double cost) {
       if (cost < min_cost) {

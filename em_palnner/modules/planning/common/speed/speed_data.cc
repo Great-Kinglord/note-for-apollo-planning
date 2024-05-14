@@ -52,21 +52,25 @@ const std::vector<common::SpeedPoint>& SpeedData::speed_vector() const {
 void SpeedData::set_speed_vector(std::vector<common::SpeedPoint> speed_points) {
   speed_vector_ = std::move(speed_points);
 }
-
+/// @brief 给定时间评估速度
+/// @param t 
+/// @param speed_point 
+/// @return 
 bool SpeedData::EvaluateByTime(const double t,
                                common::SpeedPoint* const speed_point) const {
   if (speed_vector_.size() < 2) {
     return false;
   }
+  ///时间不在范围内
   if (!(speed_vector_.front().t() < t + 1.0e-6 &&
         t - 1.0e-6 < speed_vector_.back().t())) {
     return false;
   }
-
+ ///比较函数
   auto comp = [](const common::SpeedPoint& sp, const double t) {
     return sp.t() < t;
   };
-
+  ///查找第一个时间大于或等于t的元素
   auto it_lower =
       std::lower_bound(speed_vector_.begin(), speed_vector_.end(), t, comp);
   if (it_lower == speed_vector_.end()) {
@@ -74,6 +78,7 @@ bool SpeedData::EvaluateByTime(const double t,
   } else if (it_lower == speed_vector_.begin()) {
     *speed_point = speed_vector_.front();
   } else {
+    ///前一个元素和当前找到的元素之间进行线性插值
     const auto& p0 = *(it_lower - 1);
     const auto& p1 = *it_lower;
     double t0 = p0.t();

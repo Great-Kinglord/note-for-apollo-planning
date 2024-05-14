@@ -34,6 +34,12 @@ using apollo::common::math::Box2d;
 using apollo::common::math::Vec2d;
 using apollo::common::TrajectoryPoint;
 
+/// @brief 
+/// @param config 
+/// @param reference_line 
+/// @param obstacles 
+/// @param vehicle_param 
+/// @param heuristic_speed_data 
 TrajectoryCost::TrajectoryCost(
     const DpPolyPathConfig &config, const ReferenceLine &reference_line,
     const std::vector<const PathObstacle *> &obstacles,
@@ -62,30 +68,31 @@ TrajectoryCost::TrajectoryCost(
     for (uint32_t t = 0; t <= num_of_time_stamps_; ++t) {
       TrajectoryPoint trajectory_point =
           ptr_obstacle->GetPointAtTime(t * config.eval_time_interval());
-      Box2d obstacle_box = ptr_obstacle->GetBoundingBox(trajectory_point);
+      Box2d obstacle_box = ptr_obstacle->GetBoundingBox(trajectory_point);///<得到障碍物的box
       box_by_time.push_back(obstacle_box);
     }
-    obstacle_boxes_.push_back(box_by_time); ///<把障碍物的box信息存储到obstacle_boxes_中
+    obstacle_boxes_.push_back(box_by_time); ///<把障碍物的box信息存储到obstacle_boxes_中,最外是按照障碍物，里面一层是按照时间
   }
 }
-
+/// @brief 五次多项式的代价计算
+/// @param curve 五次多项式曲线
+/// @param start_s 两个点，第一点的s
+/// @param end_s 两个点，第二个点的s
+/// @return 
 double TrajectoryCost::Calculate(const QuinticPolynomialCurve1d &curve,
                                  const double start_s,
                                  const double end_s) const {
   double total_cost = 0.0;
-  // Path_cost
+  ///路径的cost
   double path_s = 0.0;
   while (path_s < (end_s - start_s)) {
-    const double l = std::fabs(curve.Evaluate(0, path_s));
+    const double l = std::fabs(curve.Evaluate(0, path_s)); ///< 得l
     total_cost += l;
-
-    const double dl = std::fabs(curve.Evaluate(1, path_s));
+    const double dl = std::fabs(curve.Evaluate(1, path_s));///< 得dl
     total_cost += dl;
-
-    path_s += config_.path_resolution();
+    path_s += config_.path_resolution(); ///< 默认为0.1m
   }
-
-  // Obstacle cost
+  // Obstacle cost 障碍物cost
   uint32_t start_index = 0;
   bool is_found_start_index = false;
   uint32_t end_index = 0;
@@ -94,21 +101,23 @@ double TrajectoryCost::Calculate(const QuinticPolynomialCurve1d &curve,
   while (end_index != 0) {
     common::SpeedPoint speed_point;
     heuristic_speed_data_.EvaluateByTime(time_stamp, &speed_point);
+    ///大于上层点的s
     if (speed_point.s() >= start_s && !is_found_start_index) {
       start_index = index;
       is_found_start_index = true;
     }
+    ///大于当前层点的s
     if (speed_point.s() > end_s) {
       end_index = index;
     }
-    time_stamp += config_.eval_time_interval();
+    time_stamp += config_.eval_time_interval(); ///<0.1s，这应该是为了找障碍物容器
     ++index;
   }
 
   for (; start_index < end_index; ++start_index) {
     common::SpeedPoint speed_point;
     heuristic_speed_data_.EvaluateByTime(
-        start_index * config_.eval_time_interval(), &speed_point);
+        start_index * config_.eval_time_interval(), &speed_point); ///< start_index * 0.1
     const double s = speed_point.s() - start_s;
     const double l = curve.Evaluate(0, s);
     const double dl = curve.Evaluate(1, s);
@@ -125,18 +134,23 @@ double TrajectoryCost::Calculate(const QuinticPolynomialCurve1d &curve,
     double theta =
         common::math::NormalizeAngle(delta_theta + reference_point.heading());
     Box2d ego_box = {ego_xy_point, theta, vehicle_param_.length(),
-                     vehicle_param_.width()};
+                     vehicle_param_.width()}; ///<车辆的box
+    ///<遍历障碍物
     for (const auto &obstacle_trajectory : obstacle_boxes_) {
-      auto &obstacle_box = obstacle_trajectory[start_index];
-      // Simple version: calculate obstacle cost by distance
-      double distance = obstacle_box.DistanceTo(ego_box);
+      auto &obstacle_box = obstacle_trajectory[start_index];///< 障碍物对应时间的信息
+      // Simple version: calculate obstacle cost by distance 通过距离来计算障碍物的cost
+      double distance = obstacle_box.DistanceTo(ego_box);///<计算障碍物和车辆的距,两个box之间的最近距离
       if (distance > config_.obstacle_ignore_distance()) {
+        ///距离大于20m
         continue;
       } else if (distance <= config_.obstacle_collision_distance()) {
-        total_cost += config_.obstacle_collision_cost();
+        ///距离小于0.2m
+        total_cost += config_.obstacle_collision_cost(); ///<  默认为1e3
       } else if (distance <= config_.obstacle_risk_distance()) {
+        /// 距离下雨2.0m
         total_cost += RiskDistanceCost(distance);
       } else {
+        ///距离在2m到20m之间
         total_cost += RegularDistanceCost(distance);
       }
     }
@@ -145,6 +159,7 @@ double TrajectoryCost::Calculate(const QuinticPolynomialCurve1d &curve,
 }
 
 double TrajectoryCost::RiskDistanceCost(const double distance) const {
+  ///(5.0 - distance) * ((5.0 - distance)) * 10
   return (5.0 - distance) * ((5.0 - distance)) * 10;
 }
 
