@@ -32,7 +32,7 @@ message EMPlannerConfig {
 message PlanningConfig {
   enum PlannerType {
     RTK = 0;
-    EM = 1;  // expectation maximization
+    EM = 1;  /// expectation maximization最大期望算法
   };
   optional PlannerType planner_type = 1 [default = EM];
 

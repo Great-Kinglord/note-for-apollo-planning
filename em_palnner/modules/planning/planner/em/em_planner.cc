@@ -54,7 +54,7 @@ using common::math::Vec2d;
 
 void EMPlanner::RegisterTasks() {
   task_factory_.Register(TRAFFIC_DECIDER,
-                         []() -> Task* { return new TrafficDecider(); });
+                         []() -> Task* { return new TrafficDecider(); });///<返回就是一对(TRAFFIC_DECIDER,新建一个TrafficDecider对象并返回指针)
   task_factory_.Register(DP_POLY_PATH_OPTIMIZER,
                          []() -> Task* { return new DpPolyPathOptimizer(); });
   task_factory_.Register(PATH_DECIDER,
@@ -63,14 +63,20 @@ void EMPlanner::RegisterTasks() {
                          []() -> Task* { return new DpStSpeedOptimizer(); });
   task_factory_.Register(QP_SPLINE_PATH_OPTIMIZER,
                          []() -> Task* { return new QpSplinePathOptimizer(); });
-  task_factory_.Register(QP_SPLINE_ST_SPEED_OPTIMIZER, []() -> Task* {
-    return new QpSplineStSpeedOptimizer();
-  });
+  task_factory_.Register(QP_SPLINE_ST_SPEED_OPTIMIZER, []() -> Task* { return new QpSplineStSpeedOptimizer();});
 }
 
 Status EMPlanner::Init(const PlanningConfig& config) {
   AINFO << "In EMPlanner::Init()";
   RegisterTasks();
+ /** 顺序
+  * DP_POLY_PATH_OPTIMIZER
+  * DP_ST_SPEED_OPTIMIZER
+  * QP_SPLINE_PATH_OPTIMIZER
+  * QP_SPLINE_ST_SPEED_OPTIMIZER
+  * TRAFFIC_DECIDER
+  * PATH_DECIDER
+ */
   for (const auto task : config.em_planner_config().task()) {
     tasks_.emplace_back(
         task_factory_.CreateObject(static_cast<TaskType>(task))); ///<顺序 TrafficDecider DpPolyPathOptimizer PathDecider DpStSpeedOptimizer 

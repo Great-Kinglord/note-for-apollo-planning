@@ -68,5 +68,13 @@
         "typeinfo": "cpp",
         "variant": "cpp",
         "csignal": "cpp"
-    }
+    },
+    "workbench.colorCustomizations": {
+        "statusBar.background": "#6c59ef",
+        "statusBar.foreground": "#e7e7e7",
+        "statusBarItem.hoverBackground": "#9588f3",
+        "statusBarItem.remoteBackground": "#6c59ef",
+        "statusBarItem.remoteForeground": "#e7e7e7"
+    },
+    "peacock.color": "#6c59ef"
 }

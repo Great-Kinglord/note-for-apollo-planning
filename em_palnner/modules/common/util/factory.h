@@ -80,9 +80,9 @@ class Factory {
   }
 
   /**
-   * @brief Creates and transfers membership of an object of type matching id.
-   * Need to register id before CreateObject is called.
-   * @param id The identifier of the class we which to instantiate
+   * @brief 创建和传输类型匹配id的对象的成员关系
+   * 需要在CreateObject被调用之前注册id
+   * @param id 我们要实例化的类的标识符
    */
   std::unique_ptr<AbstractProduct> CreateObject(const IdentifierType &id) {
     auto id_iter = producers_.find(id);
