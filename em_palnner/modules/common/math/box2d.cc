@@ -255,6 +255,9 @@ double Box2d::DistanceTo(const Box2d &box) const {
   return Polygon2d(box).DistanceTo(*this);///< 调用Polygon2d的DistanceTo函数
 }
 
+/// @brief OBB重叠判断
+/// @param box 
+/// @return 
 bool Box2d::HasOverlap(const Box2d &box) const {
   const double shift_x = box.center_x() - center_.x();
   const double shift_y = box.center_y() - center_.y();

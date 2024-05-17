@@ -73,7 +73,10 @@ StBoundaryMapper::StBoundaryMapper(const hdmap::PncMap* pnc_map,
           common::VehicleConfigHelper::instance()->GetConfig().vehicle_param()),
       planning_distance_(planning_distance),
       planning_time_(planning_time) {}
-
+/// @brief 创建ST边界
+/// @param path_decision 
+/// @param st_boundaries 
+/// @return 
 Status StBoundaryMapper::GetGraphBoundary(
     const PathDecision& path_decision,
     std::vector<StBoundary>* const st_boundaries) const {
@@ -83,13 +86,13 @@ Status StBoundaryMapper::GetGraphBoundary(
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
-
+  ///时间默认3s
   if (planning_time_ < 0.0) {
     const std::string msg = "Fail to get params since planning_time_ < 0.";
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
-
+  ///路径点数小于2
   if (path_data_.discretized_path().NumOfPoints() < 2) {
     AERROR << "Fail to get params because of too few path points. path points "
               "size: "
@@ -103,9 +106,9 @@ Status StBoundaryMapper::GetGraphBoundary(
   const PathObstacle* stop_obstacle = nullptr;
   ObjectDecisionType stop_decision;
   double min_stop_s = std::numeric_limits<double>::max();
-
+  ///遍历目标用作stop
   for (const auto* path_obstacle : path_obstacles.Items()) {
-    if (!path_obstacle->HasLongitudinalDecision()) {
+    if (!path_obstacle->HasLongitudinalDecision()) {///<针对没有决策的障碍物
       StBoundary boundary;
       const auto ret = MapWithoutDecision(*path_obstacle, &boundary);
       if (!ret.ok()) {
@@ -243,7 +246,11 @@ Status StBoundaryMapper::MapWithoutDecision(const PathObstacle& path_obstacle,
   }
   return Status::OK();
 }
-
+/**获取重合点的路径点
+ * 对于每个障碍物 以及他的预测轨迹，只需要编译每个障碍物预测轨迹点，然后去查询
+ * 路径规划得到的路径点，然后判断是否有重叠，如果有重叠，就可以构造一个(累计距离s，相对时间)
+ * 的一个锚点
+*/
 bool StBoundaryMapper::GetOverlapBoundaryPoints(
     const std::vector<PathPoint>& path_points, const Obstacle& obstacle,
     std::vector<STPoint>* upper_points,
@@ -260,16 +267,19 @@ bool StBoundaryMapper::GetOverlapBoundaryPoints(
   }
 
   const auto& trajectory = obstacle.Trajectory();
+  /// 障碍物静止
   if (trajectory.trajectory_point_size() == 0) {
+    ///遍历自车轨迹规划点
     for (const auto& curr_point_on_path : path_points) {
-      if (curr_point_on_path.s() > planning_distance_) {
+      if (curr_point_on_path.s() > planning_distance_) {///<规划距离超出超出config中的距离
         break;
       }
-      const Box2d obs_box = obstacle.PerceptionBoundingBox();
+      const Box2d obs_box = obstacle.PerceptionBoundingBox();///<获取障碍物的包围盒
 
       if (CheckOverlap(curr_point_on_path, obs_box,
-                       st_boundary_config_.boundary_buffer())) {
-        lower_points->emplace_back(curr_point_on_path.s(), 0.0);
+                       st_boundary_config_.boundary_buffer())) {///<检查是否有重叠,buffer是一个阈值0.1m
+        ///如果有重叠，就是时间从头到尾，在st图上
+        lower_points->emplace_back(curr_point_on_path.s(), 0.0);///< 有重叠的s点
         lower_points->emplace_back(curr_point_on_path.s(), planning_time_);
         upper_points->emplace_back(planning_distance_, 0.0);
         upper_points->emplace_back(planning_distance_, planning_time_);
@@ -277,18 +287,21 @@ bool StBoundaryMapper::GetOverlapBoundaryPoints(
       }
     }
   } else {
+    /// 动态障碍物
     const int default_num_point = 50;
     DiscretizedPath discretized_path;
-    if (path_points.size() > 2 * default_num_point) {
+    if (path_points.size() > 2 * default_num_point) { ///< 路径点数超过100个
+    ///路径点超过100个，就过多了，需要进行采样，减少计算量
       const int ratio = path_points.size() / default_num_point;
       std::vector<PathPoint> sampled_path_points;
       for (size_t i = 0; i < path_points.size(); ++i) {
-        if (i % ratio == 0) {
+        if (i % ratio == 0) {///< 余数为0
           sampled_path_points.push_back(path_points[i]);
         }
       }
       discretized_path.set_path_points(sampled_path_points);
     } else {
+      ///路径点数小于100个,不需要采样再进行稀疏了
       discretized_path.set_path_points(path_points);
     }
     for (int i = 0; i < trajectory.trajectory_point_size(); ++i) {
@@ -296,13 +309,14 @@ bool StBoundaryMapper::GetOverlapBoundaryPoints(
       if (i > 0) {
         const auto& pre_point = trajectory.trajectory_point(i - 1);
         if (trajectory_point.relative_time() <= pre_point.relative_time()) {
+          ///时间一定要是递增的
           AERROR << "Fail to map because prediction time is not increasing."
                  << "current point: " << trajectory_point.ShortDebugString()
                  << "previous point: " << pre_point.ShortDebugString();
           return false;
         }
       }
-
+      
       const Box2d obs_box = obstacle.GetBoundingBox(trajectory_point);
 
       double trajectory_point_time = trajectory_point.relative_time();
@@ -443,19 +457,24 @@ Status StBoundaryMapper::MapWithPredictionTrajectory(
   }
   return Status::OK();
 }
-
+/// @brief 判断是否有重叠
+/// @param path_point 规划路径点中其中一个点
+/// @param obs_box 障碍物的包围盒
+/// @param buffer 0.1m
+/// @return 
 bool StBoundaryMapper::CheckOverlap(const PathPoint& path_point,
                                     const Box2d& obs_box,
                                     const double buffer) const {
+  ///车辆中心到后轴中心的距离
   const double mid_to_rear_center =
-      vehicle_param_.length() / 2.0 - vehicle_param_.front_edge_to_center();
+      vehicle_param_.length() / 2.0 - vehicle_param_.front_edge_to_center();///< 半个车宽-中心到后轴中心的距离
   const double x =
-      path_point.x() - mid_to_rear_center * std::cos(path_point.theta());
+      path_point.x() - mid_to_rear_center * std::cos(path_point.theta());///? 看起来像是从中心点转移到后轴中心
   const double y =
-      path_point.y() - mid_to_rear_center * std::sin(path_point.theta());
+      path_point.y() - mid_to_rear_center * std::sin(path_point.theta());///? 但是应当是得到中点才对
   const Box2d adc_box =
       Box2d({x, y}, path_point.theta(), vehicle_param_.length() + 2 * buffer,
-            vehicle_param_.width() + 2 * buffer);
+            vehicle_param_.width() + 2 * buffer);///< 自车的包围盒
   return obs_box.HasOverlap(adc_box);
 }
 

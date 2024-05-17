@@ -52,6 +52,14 @@ bool DpStSpeedOptimizer::Init(const PlanningConfig& config) {
   return true;
 }
 
+/// @brief 主函数
+/// @param adc_sl_boundary 从reference_line_info中获取
+/// @param path_data 从reference_line_info中获取，就是mutable_path_data，横向规划完的结果
+/// @param init_point 从frame中获取
+/// @param reference_line 从reference_line_info中获取
+/// @param path_decision 从reference_line_info中获取
+/// @param speed_data 从reference_line_info中获取，意思就是最终也是放到参考线中
+/// @return 
 Status DpStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
                                    const PathData& path_data,
                                    const common::TrajectoryPoint& init_point,
@@ -62,19 +70,19 @@ Status DpStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
     AERROR << "Please call Init() before process DpStSpeedOptimizer.";
     return Status(ErrorCode::PLANNING_ERROR, "Not inited.");
   }
-
+  /// 判断有没有路径生成
   if (path_data.discretized_path().NumOfPoints() == 0) {
     std::string msg("Empty path data");
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
-
+  ///应该就是栅格地图，pnc_map就是routing的结果，adc_sl_boundary就是自车的SL的边界
   StBoundaryMapper boundary_mapper(
       reference_line_info_->pnc_map(), adc_sl_boundary, st_boundary_config_,
       reference_line, path_data, dp_st_speed_config_.total_path_length(),
-      dp_st_speed_config_.total_time());
+      dp_st_speed_config_.total_time()); ///? total_path_length默认0.1，total_time默认3.0
 
-  // step 1 get boundaries
+  /// step 1 get boundaries 第一步获取边界，考虑了障碍物
   std::vector<StBoundary> boundaries;
   if (boundary_mapper.GetGraphBoundary(*path_decision, &boundaries).code() ==
       ErrorCode::PLANNING_ERROR) {
@@ -84,7 +92,7 @@ Status DpStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
 
-  // step 2 perform graph search
+  // step 2 开始DP去搜索了
   SpeedLimit speed_limit;
   if (!boundary_mapper.GetSpeedLimits(&speed_limit).ok()) {
     const std::string msg =
