@@ -230,7 +230,7 @@ Status StBoundaryMapper::MapWithoutDecision(const PathObstacle& path_obstacle,
                                 &lower_points)) {
     return Status::OK();
   }
-
+  ///lower和upper需要成对存在的，不然就是有问题
   if (lower_points.size() != upper_points.size()) {
     std::string msg = common::util::StrCat(
         "lower_points.size()[", lower_points.size(),
@@ -239,9 +239,10 @@ Status StBoundaryMapper::MapWithoutDecision(const PathObstacle& path_obstacle,
   }
 
   if (lower_points.size() > 1 && upper_points.size() > 1) {
+    ///GenerateStBoundary为静态函数，没有创建类的时候可以调用，只能访问静态成员
     *boundary = StBoundary::GenerateStBoundary(lower_points, upper_points)
                     .ExpandByS(boundary_s_buffer)
-                    .ExpandByT(boundary_t_buffer);
+                    .ExpandByT(boundary_t_buffer);///< t_buffer是0.1s，s_buffer是1.0m
     boundary->SetId(path_obstacle.obstacle()->Id());
   }
   return Status::OK();
@@ -304,6 +305,7 @@ bool StBoundaryMapper::GetOverlapBoundaryPoints(
       ///路径点数小于100个,不需要采样再进行稀疏了
       discretized_path.set_path_points(path_points);
     }
+    ///遍历障碍物的预测轨迹点,每个点去画出目标box
     for (int i = 0; i < trajectory.trajectory_point_size(); ++i) {
       const auto& trajectory_point = trajectory.trajectory_point(i);
       if (i > 0) {
@@ -316,37 +318,42 @@ bool StBoundaryMapper::GetOverlapBoundaryPoints(
           return false;
         }
       }
-      
+      /// 当前点处的目标box
       const Box2d obs_box = obstacle.GetBoundingBox(trajectory_point);
 
       double trajectory_point_time = trajectory_point.relative_time();
       const double kNegtiveTimeThreshold = -1.0;
       if (trajectory_point_time < kNegtiveTimeThreshold) {
-        continue;
+        continue; ///! 去除无效的点
       }
 
-      const double step_length = vehicle_param_.front_edge_to_center();
+      const double step_length = vehicle_param_.front_edge_to_center();///< 车辆前边缘到后轴中心的距离
+      ///遍历自车规划的路径点
       for (double path_s = 0.0; path_s < discretized_path.Length();
-           path_s += step_length) {
+           path_s += step_length) {///! 前后两box之间是有重叠的
+        ///当前时间，自车的位置
         const auto curr_adc_path_point =
             discretized_path.EvaluateUsingLinearApproximation(
                 path_s + discretized_path.StartPoint().s());
+          ///检查障碍物和规划路径的重叠，是不用考虑路径的时间的，因为规划的路径现在还没有时间
         if (CheckOverlap(curr_adc_path_point, obs_box,
-                         st_boundary_config_.boundary_buffer())) {
-          // found overlap, start searching with higher resolution
+                         st_boundary_config_.boundary_buffer())) 
+        {
+          ///如果有重叠，需要更小精度的去寻找，也就是规划的路径太稀疏
+          ///! 知道重叠了，我需要更精确知道重叠区域的，所以提高了精确度
           const double backward_distance = -step_length;
           const double forward_distance = vehicle_param_.length() +
                                           vehicle_param_.width() +
                                           obs_box.length() + obs_box.width();
-          const double default_min_step = 0.1;  // in meters
+          const double default_min_step = 0.1;  // 单位m
           const double fine_tuning_step_length = std::fmin(
-              default_min_step, discretized_path.Length() / default_num_point);
+              default_min_step, discretized_path.Length() / default_num_point);///< 0.1和path长度/50中的最小值
 
           bool find_low = false;
           bool find_high = false;
-          double low_s = std::fmax(0.0, path_s + backward_distance);
+          double low_s = std::fmax(0.0, path_s + backward_distance);///< 回到上一步
           double high_s =
-              std::fmin(discretized_path.Length(), path_s + forward_distance);
+              std::fmin(discretized_path.Length(), path_s + forward_distance);///< 需要小于最大长度
 
           while (low_s < high_s) {
             if (find_low && find_high) {
@@ -358,15 +365,16 @@ bool StBoundaryMapper::GetOverlapBoundaryPoints(
                       low_s + discretized_path.StartPoint().s());
               if (!CheckOverlap(point_low, obs_box,
                                 st_boundary_config_.boundary_buffer())) {
-                low_s += fine_tuning_step_length;
+                low_s += fine_tuning_step_length;///<更小精度的去寻找
               } else {
+                ///有重叠，找到了第一个重叠的点，就是低点
                 find_low = true;
               }
             }
             if (!find_high) {
               const auto& point_high =
                   discretized_path.EvaluateUsingLinearApproximation(
-                      high_s + discretized_path.StartPoint().s());
+                      high_s + discretized_path.StartPoint().s());///< 从最大长度往后寻找
               if (!CheckOverlap(point_high, obs_box,
                                 st_boundary_config_.boundary_buffer())) {
                 high_s -= fine_tuning_step_length;
@@ -378,7 +386,7 @@ bool StBoundaryMapper::GetOverlapBoundaryPoints(
           if (find_high && find_low) {
             lower_points->emplace_back(
                 low_s - st_boundary_config_.point_extension(),
-                trajectory_point_time);
+                trajectory_point_time);///< 默认point_extension是1.0m，为了更加的安全
             upper_points->emplace_back(
                 high_s + st_boundary_config_.point_extension(),
                 trajectory_point_time);
@@ -467,11 +475,11 @@ bool StBoundaryMapper::CheckOverlap(const PathPoint& path_point,
                                     const double buffer) const {
   ///车辆中心到后轴中心的距离
   const double mid_to_rear_center =
-      vehicle_param_.length() / 2.0 - vehicle_param_.front_edge_to_center();///< 半个车宽-中心到后轴中心的距离
+      vehicle_param_.length() / 2.0 - vehicle_param_.front_edge_to_center();///< 半个车宽-中心到后轴中心的距离，这是负值
   const double x =
-      path_point.x() - mid_to_rear_center * std::cos(path_point.theta());///? 看起来像是从中心点转移到后轴中心
+      path_point.x() - mid_to_rear_center * std::cos(path_point.theta());///< 后轴中心转移到中心
   const double y =
-      path_point.y() - mid_to_rear_center * std::sin(path_point.theta());///? 但是应当是得到中点才对
+      path_point.y() - mid_to_rear_center * std::sin(path_point.theta());///< 后轴中心转移到中心
   const Box2d adc_box =
       Box2d({x, y}, path_point.theta(), vehicle_param_.length() + 2 * buffer,
             vehicle_param_.width() + 2 * buffer);///< 自车的包围盒

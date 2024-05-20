@@ -57,7 +57,9 @@ double DiscretizedPath::Length() const {
   }
   return path_points_.back().s() - path_points_.front().s();
 }
-
+/// @brief 使用线性插值法计算路径点
+/// @param path_s 
+/// @return 
 common::PathPoint DiscretizedPath::EvaluateUsingLinearApproximation(
     const double path_s) const {
   CHECK(!path_points_.empty());

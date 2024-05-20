@@ -37,7 +37,7 @@ StBoundary::StBoundary(
   CHECK(IsValid(point_pairs)) << "The input point_pairs are NOT valid";
 
   std::vector<std::pair<STPoint, STPoint>> reduced_pairs(point_pairs);
-  RemoveRedundantPoints(&reduced_pairs);
+  RemoveRedundantPoints(&reduced_pairs); ///< 剔除冗余点
 
   for (const auto& item : reduced_pairs) {
     // use same t for both points
@@ -83,7 +83,7 @@ void StBoundary::RemoveRedundantPoints(
 
   while (i < point_pairs->size() && j + 1 < point_pairs->size()) {
     LineSegment2d lower_seg(point_pairs->at(i).first,
-                            point_pairs->at(j + 1).first);
+                            point_pairs->at(j + 1).first);///<构造函数后计算出长度、单位向量
     LineSegment2d upper_seg(point_pairs->at(i).second,
                             point_pairs->at(j + 1).second);
     if (!IsPointNear(lower_seg, point_pairs->at(j).first, kMaxDist) ||
@@ -387,6 +387,7 @@ StBoundary StBoundary::GenerateStBoundary(
         STPoint(lower_points.at(i).s(), lower_points.at(i).t()),
         STPoint(upper_points.at(i).s(), upper_points.at(i).t()));
   }
+///todo 返回类的构造函数来创建并返回一个新的对象，可以学习下
   return StBoundary(point_pairs);
 }
 

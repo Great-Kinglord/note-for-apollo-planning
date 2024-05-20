@@ -94,7 +94,10 @@ class StBoundary : public common::math::Polygon2d {
   double DistanceS(const STPoint& st_point) const;
   std::vector<STPoint> upper_points() const { return upper_points_; }
   std::vector<STPoint> lower_points() const { return lower_points_; }
-
+  /// @brief 静态函数，好处更加灵活，不需要实例化对象
+  /// @param lower_points 
+  /// @param upper_points 
+  /// @return 
   static StBoundary GenerateStBoundary(
       const std::vector<STPoint>& lower_points,
       const std::vector<STPoint>& upper_points);

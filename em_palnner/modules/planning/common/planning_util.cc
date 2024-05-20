@@ -70,7 +70,11 @@ PathPoint interpolate(const PathPoint &p0, const PathPoint &p1,
   p.set_s(s);
   return p;
 }
-
+/// @brief 线性插值
+/// @param p0 
+/// @param p1 
+/// @param s 
+/// @return 
 PathPoint InterpolateUsingLinearApproximation(const PathPoint &p0,
                                               const PathPoint &p1,
                                               const double s) {
