@@ -110,7 +110,7 @@ Status StBoundaryMapper::GetGraphBoundary(
   for (const auto* path_obstacle : path_obstacles.Items()) {
     if (!path_obstacle->HasLongitudinalDecision()) {///<针对没有决策的障碍物
       StBoundary boundary;
-      const auto ret = MapWithoutDecision(*path_obstacle, &boundary);
+      const auto ret = MapWithoutDecision(*path_obstacle, &boundary);///< 建立边界st图
       if (!ret.ok()) {
         std::string msg = common::util::StrCat(
             "Fail to map obstacle ", path_obstacle->Id(), " without decision.");
@@ -120,17 +120,19 @@ Status StBoundaryMapper::GetGraphBoundary(
       AppendBoundary(boundary, st_boundaries);
       continue;
     }
+    ///针对有决策的障碍物
     const auto& decision = path_obstacle->LongitudinalDecision();
-    if (decision.has_stop()) {
+    if (decision.has_stop()) {///<如果有停车决策
       const double stop_s = path_obstacle->perception_sl_boundary().start_s() +
                             decision.stop().distance_s();
-      if (stop_s < adc_sl_boundary_.end_s()) {
+      if (stop_s < adc_sl_boundary_.end_s()) {///<停车的位置在自车的后面
         AERROR << "Invalid stop decision. not stop at ahead of current "
                   "position. stop_s : "
                << stop_s << ", and current adc_s is; "
                << adc_sl_boundary_.end_s();
         return Status(ErrorCode::PLANNING_ERROR, "invalid decision");
       }
+      ///找最近需要停车的障碍物
       if (!stop_obstacle) {
         stop_obstacle = path_obstacle;
         stop_decision = decision;
@@ -142,6 +144,7 @@ Status StBoundaryMapper::GetGraphBoundary(
       }
     } else if (decision.has_follow() || decision.has_overtake() ||
                decision.has_yield()) {
+      ///不用停车，需要跟随，超车，让行
       StBoundary boundary;
       const auto ret =
           MapWithPredictionTrajectory(*path_obstacle, decision, &boundary);
@@ -156,7 +159,7 @@ Status StBoundaryMapper::GetGraphBoundary(
       ADEBUG << "No mapping for decision: " << decision.DebugString();
     }
   }
-
+  ///如果有停车障碍物，最近需要停车的障碍物
   if (stop_obstacle) {
     StBoundary stop_boundary;
     bool success =
@@ -183,8 +186,10 @@ bool StBoundaryMapper::MapStopDecision(const PathObstacle& stop_obstacle,
   PathPoint obstacle_point;
   if (stop_obstacle.perception_sl_boundary().start_s() >
       path_data_.frenet_frame_path().points().back().s()) {
+    ///停车点在规划路径后面
     return true;
   }
+  ///todo 无法获取path point
   if (!path_data_.GetPathPointWithRefS(
           stop_obstacle.perception_sl_boundary().start_s(), &obstacle_point)) {
     AERROR << "Fail to get path point from reference s. The sl boundary of "
@@ -193,10 +198,10 @@ bool StBoundaryMapper::MapStopDecision(const PathObstacle& stop_obstacle,
            << " is: " << stop_obstacle.perception_sl_boundary().DebugString();
     return false;
   }
-
+  /// stop_s小于0
   const double st_stop_s =
       obstacle_point.s() + stop_decision.stop().distance_s() -
-      vehicle_param_.front_edge_to_center() - FLAGS_decision_valid_stop_range;
+      vehicle_param_.front_edge_to_center() - FLAGS_decision_valid_stop_range;///< -0.5m
   if (st_stop_s < 0.0) {
     AERROR << "obstacle " << stop_obstacle.Id() << " st stop_s " << st_stop_s
            << " is less than 0.";
@@ -215,7 +220,7 @@ bool StBoundaryMapper::MapStopDecision(const PathObstacle& stop_obstacle,
   *boundary = StBoundary(point_pairs);
 
   boundary->SetBoundaryType(StBoundary::BoundaryType::STOP);
-  boundary->SetCharacteristicLength(st_boundary_config_.boundary_buffer());
+  boundary->SetCharacteristicLength(st_boundary_config_.boundary_buffer()); ///< 0.1
   boundary->SetId(stop_obstacle.Id());
   return true;
 }
@@ -399,7 +404,11 @@ bool StBoundaryMapper::GetOverlapBoundaryPoints(
   DCHECK_EQ(lower_points->size(), upper_points->size());
   return (lower_points->size() > 0 && upper_points->size() > 0);
 }
-
+/// @brief 
+/// @param path_obstacle 
+/// @param obj_decision 
+/// @param boundary 
+/// @return 
 Status StBoundaryMapper::MapWithPredictionTrajectory(
     const PathObstacle& path_obstacle, const ObjectDecisionType& obj_decision,
     StBoundary* const boundary) const {
@@ -426,15 +435,16 @@ Status StBoundaryMapper::MapWithPredictionTrajectory(
   }
 
   if (lower_points.size() > 1 && upper_points.size() > 1) {
+    ///针对跟随的情况，时间在规划时间之前，就需要延长
     if (obj_decision.has_follow() && lower_points.back().t() < planning_time_) {
       const double diff_s = lower_points.back().s() - lower_points.front().s();
       const double diff_t = lower_points.back().t() - lower_points.front().t();
+      ///延长一直到planning_time_
       double extend_lower_s =
           diff_s / diff_t * (planning_time_ - lower_points.front().t()) +
           lower_points.front().s();
       const double extend_upper_s =
-          extend_lower_s + (upper_points.back().s() - lower_points.back().s()) +
-          1.0;
+          extend_lower_s + (upper_points.back().s() - lower_points.back().s()) + 1.0;
       upper_points.emplace_back(extend_upper_s, planning_time_);
       lower_points.emplace_back(extend_lower_s, planning_time_);
     }
@@ -443,7 +453,7 @@ Status StBoundaryMapper::MapWithPredictionTrajectory(
                     .ExpandByS(boundary_s_buffer)
                     .ExpandByT(boundary_t_buffer);
 
-    // get characteristic_length and boundary_type.
+    // get characteristic_length and boundary_type.获取特征长度和边界类型
     StBoundary::BoundaryType b_type = StBoundary::BoundaryType::UNKNOWN;
     double characteristic_length = 0.0;
     if (obj_decision.has_follow()) {
@@ -515,7 +525,9 @@ Status StBoundaryMapper::GetSpeedLimits(
   }
   return Status::OK();
 }
-
+/// @brief 函数的作用是将一个 StBoundary 对象添加到一个 StBoundary 对象的向量中
+/// @param boundary 
+/// @param st_boundaries 
 void StBoundaryMapper::AppendBoundary(
     const StBoundary& boundary, std::vector<StBoundary>* st_boundaries) const {
   if (Double::Compare(boundary.Area(), 0.0) <= 0) {

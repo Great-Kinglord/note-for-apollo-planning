@@ -147,7 +147,7 @@ void StBoundary::CalculateArea() {
     area_ += (upper_points_[i].y() - lower_points_[i].y()) *
              (lower_points_[i + 1].x() - lower_points_[i].x());
   }
-  area_ *= 0.5;
+  area_ *= 0.5;///? 为什么乘以0.5
 }
 
 bool StBoundary::IsPointInBoundary(const STPoint& st_point) const {
@@ -177,7 +177,9 @@ STPoint StBoundary::BottomRightPoint() const {
   DCHECK(!lower_points_.empty()) << "StBoundary has zero points.";
   return lower_points_.back();
 }
-
+/// @brief s方向扩展，为了安全考虑，逻辑简单
+/// @param s 
+/// @return 
 StBoundary StBoundary::ExpandByS(const double s) const {
   if (lower_points_.empty()) {
     AERROR << "The current st_boundary has NO points.";
@@ -191,7 +193,9 @@ StBoundary StBoundary::ExpandByS(const double s) const {
   }
   return StBoundary(std::move(point_pairs));
 }
-
+/// @brief t方向扩展，为了安全考虑，逻辑就不是简单的加减了，而是根据斜率来计算
+/// @param t 
+/// @return 
 StBoundary StBoundary::ExpandByT(const double t) const {
   if (lower_points_.empty()) {
     AERROR << "The current st_boundary has NO points.";
