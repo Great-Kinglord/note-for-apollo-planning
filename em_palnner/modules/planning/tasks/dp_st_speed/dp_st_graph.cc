@@ -70,12 +70,16 @@ DpStGraph::DpStGraph(const ReferenceLine& reference_line,
       init_point_(st_graph_data.init_point()) {
   dp_st_speed_config_.set_total_path_length(
       std::fmin(dp_st_speed_config_.total_path_length(),
-                st_graph_data_.path_data_length()));
+                st_graph_data_.path_data_length())); ///< 标定total_path_length = 80m
   vehicle_param_ = VehicleConfigHelper::GetConfig().vehicle_param();
 }
-
+/// @brief DP主函数
+/// @param path_decision 
+/// @param speed_data 
+/// @return 
 Status DpStGraph::Search(PathDecision* const path_decision,
                          SpeedData* const speed_data) {
+  
   if (!InitCostTable().ok()) {
     const std::string msg = "Initialize cost table failed.";
     AERROR << msg;
@@ -105,27 +109,28 @@ Status DpStGraph::Search(PathDecision* const path_decision,
 }
 
 Status DpStGraph::InitCostTable() {
-  uint32_t dim_s = dp_st_speed_config_.matrix_dimension_s();
-  uint32_t dim_t = dp_st_speed_config_.matrix_dimension_t();
-
-  if (Double::Compare(dp_st_speed_config_.total_path_length(), 0.0) == 0) {
+  uint32_t dim_s = dp_st_speed_config_.matrix_dimension_s(); ///? 默认100，s的维数？
+  uint32_t dim_t = dp_st_speed_config_.matrix_dimension_t();///? 默认为10，t的维数？
+  /// total_path_length 默认为80m
+  if (Double::Compare(dp_st_speed_config_.total_path_length(), 0.0) == 0) {///< 长度 == 0
     unit_s_ = 1e-8;
     dim_s =
         std::min(dim_s, static_cast<uint32_t>(
-                            dp_st_speed_config_.total_path_length() / unit_s_) +
-                            1);
+                            dp_st_speed_config_.total_path_length() / unit_s_) + 1);///< 基本不会进入
   } else {
-    unit_s_ = dp_st_speed_config_.total_path_length() / dim_s;
+    unit_s_ = dp_st_speed_config_.total_path_length() / dim_s; ///< 80m/100,每个维度0.8
   }
 
   unit_t_ = dp_st_speed_config_.total_time() /
-            dp_st_speed_config_.matrix_dimension_t();
+            dp_st_speed_config_.matrix_dimension_t(); ///< 8s/10,每个维度0.8s
   DCHECK_GT(dim_s, 2);
   DCHECK_GT(dim_t, 2);
+  ///二维向量也就是一个矩阵，dim_t表示外层向量的大小，dim_s表示内层向量的大小
   cost_table_ = std::vector<std::vector<StGraphPoint>>(
       dim_t, std::vector<StGraphPoint>(dim_s, StGraphPoint()));
 
   double curr_t = 0.0;
+  ///矩阵建立起来了，每个刻度对应s,或者t
   for (uint32_t i = 0; i < cost_table_.size(); ++i, curr_t += unit_t_) {
     auto& cost_table_i = cost_table_[i];
     double curr_s = 0.0;
@@ -141,9 +146,8 @@ void DpStGraph::CalculatePointwiseCost(
   // TODO(all): extract reference line from decision first
   std::vector<STPoint> reference_points;
   double curr_t = 0.0;
-  for (uint32_t i = 0; i < cost_table_.size(); ++i) {
-    reference_points.emplace_back(curr_t * dp_st_speed_config_.max_speed(),
-                                  curr_t);
+  for (uint32_t i = 0; i < cost_table_.size(); ++i) {///< 这里size就是10
+    reference_points.emplace_back(curr_t * dp_st_speed_config_.max_speed(),curr_t); ///< 位移，以及时间
     curr_t += unit_t_;
   }
 
@@ -151,8 +155,7 @@ void DpStGraph::CalculatePointwiseCost(
     for (auto& st_graph_point : cost_table_[i]) {
       double ref_cost = dp_st_cost_.GetReferenceCost(st_graph_point.point(),
                                                      reference_points[i]);
-      double obs_cost =
-          dp_st_cost_.GetObstacleCost(st_graph_point.point(), boundaries);
+      double obs_cost = dp_st_cost_.GetObstacleCost(st_graph_point.point(), boundaries);
       st_graph_point.SetReferenceCost(ref_cost);
       st_graph_point.SetObstacleCost(obs_cost);
       st_graph_point.SetTotalCost(std::numeric_limits<double>::infinity());

@@ -145,7 +145,15 @@ bool Double::ApproximatelyEqual(double a, double b, double epsilon) {
 bool Double::EssentiallyEqual(double a, double b, double epsilon) {
   return std::fabs(a - b) <= std::fmin(std::fabs(a), std::fabs(b)) * epsilon;
 }
-
+/**更加精确的比较方法
+ * 常用方法是直接比较 a 和 b 的差的绝对值与 epsilon 的大小确实是一种常见的浮点数比较方法，但这种方法在处理极大或极小的浮点数时可能会出现问题。
+ * 当 a 和 b 的值非常大时，由于浮点数的精度限制，它们之间的差可能会被舍入到一个比实际值大得多的值。这时，即使 a 和 b 实际上非常接近，
+ * 直接比较它们的差和 epsilon 也可能会认为它们不相等。
+ * 同样，当 a 和 b 的值非常小（接近于机器 epsilon）时，它们的差可能会被舍入到 0。这时，即使 a 和 b 实际上有较大的差距，
+ * 直接比较它们的差和 epsilon 也可能会错误地认为它们相等。
+ * 因此，这里的方法通过将 epsilon 与 a 和 b 的绝对值相乘，将 epsilon 缩放到一个与 a 和 b 的大小相当的范围，
+ * 然后再进行比较。这样可以避免上述问题，使得比较结果更加精确。
+*/
 bool Double::DefinitelyGreaterThan(double a, double b, double epsilon) {
   return (a - b) > std::fmax(std::fabs(a), std::fabs(b)) * epsilon;
 }

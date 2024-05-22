@@ -108,7 +108,7 @@ Status DpStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
                      path_data, adc_sl_boundary);
   auto* debug = frame_->DebugLogger();
   STGraphDebug* st_graph_debug = debug->mutable_planning_data()->add_st_graph();
-
+  ///开始DP搜索了
   if (!st_graph.Search(path_decision, speed_data).ok()) {
     const std::string msg(Name() +
                           ":Failed to search graph with dynamic programming.");

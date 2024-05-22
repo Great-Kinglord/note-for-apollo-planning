@@ -358,7 +358,7 @@ double ReferenceLine::GetSpeedLimitFromS(const double s) const {
       continue;
     }
     speed_limit =
-        std::fmin(lane_waypoint.lane->lane().speed_limit(), speed_limit);
+        std::fmin(lane_waypoint.lane->lane().speed_limit(), speed_limit);///<道路限速和标定的限速取小
   }
   return speed_limit;
 }

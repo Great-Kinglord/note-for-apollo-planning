@@ -40,11 +40,12 @@ double DpStCost::GetObstacleCost(
     const STPoint& point, const std::vector<StBoundary>& st_boundaries) const {
   double total_cost = 0.0;
   for (const StBoundary& boundary : st_boundaries) {
-    if (point.s() < 0 || boundary.IsPointInBoundary(point)) {
+    if (point.s() < 0 || boundary.IsPointInBoundary(point)) { ///<某些s在障碍物st图上，那就代表碰撞，cost设置为无穷大，s也不能小于0，就是不能往回走
       total_cost = std::numeric_limits<double>::infinity();
       break;
     } else {
       const double distance = boundary.DistanceS(point);
+      ///default_obstacle_cost = 1e10，obstacle_cost_factor = -300，distance越小表示越近，cost越大
       total_cost += dp_st_speed_config_.default_obstacle_cost() *
                     std::exp(dp_st_speed_config_.obstacle_cost_factor() /
                              boundary.characteristic_length() * distance);
@@ -52,12 +53,15 @@ double DpStCost::GetObstacleCost(
   }
   return total_cost * unit_t_;
 }
-
+/// @brief 
+/// @param point 
+/// @param reference_point 
+/// @return 
 double DpStCost::GetReferenceCost(const STPoint& point,
                                   const STPoint& reference_point) const {
+  ///! 这个cost竟然没用到，应为reference_weight为0
   return dp_st_speed_config_.reference_weight() *
-         (point.s() - reference_point.s()) * (point.s() - reference_point.s()) *
-         unit_t_;
+         (point.s() - reference_point.s()) * (point.s() - reference_point.s()) * unit_t_;///<权重*(实际位置-参考位置)^2 * 单位时间
 }
 
 double DpStCost::GetSpeedCost(const STPoint& first, const STPoint& second,

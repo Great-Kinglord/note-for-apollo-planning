@@ -496,6 +496,9 @@ bool StBoundaryMapper::CheckOverlap(const PathPoint& path_point,
   return obs_box.HasOverlap(adc_box);
 }
 
+/// @brief 获取速度限制
+/// @param speed_limit_data 
+/// @return 
 Status StBoundaryMapper::GetSpeedLimits(
     SpeedLimit* const speed_limit_data) const {
   CHECK_NOTNULL(speed_limit_data);
@@ -509,17 +512,17 @@ Status StBoundaryMapper::GetSpeedLimits(
     }
 
     double speed_limit_on_reference_line =
-        reference_line_.GetSpeedLimitFromS(path_point.s());
+        reference_line_.GetSpeedLimitFromS(path_point.s()); ///<限速来自于道路限速和标定写的最大速度
 
-    // speed limit from path curvature
+    /// 计算曲率得到的限速,公式就是简单的a = v^2 * kappa
     double speed_limit_on_path =
         std::sqrt(st_boundary_config_.centric_acceleration_limit() /
                   std::fmax(std::fabs(path_point.kappa()),
-                            st_boundary_config_.minimal_kappa()));
+                            st_boundary_config_.minimal_kappa())); ///< 向心速度限值为1，最小曲率为0.00001，防止除0
 
     const double curr_speed_limit = std::fmax(
         st_boundary_config_.lowest_speed(),
-        std::fmin(speed_limit_on_path, speed_limit_on_reference_line));
+        std::fmin(speed_limit_on_path, speed_limit_on_reference_line));///< lowest_speed默认为2.5m/s
 
     speed_limit_data->AppendSpeedLimit(path_point.s(), curr_speed_limit);
   }

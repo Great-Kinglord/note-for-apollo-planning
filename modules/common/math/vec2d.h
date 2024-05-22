@@ -96,7 +96,7 @@ class Vec2d {
   Vec2d operator+(const Vec2d &other) const;
 
   //! Subtracts two Vec2d
-  Vec2d operator-(const Vec2d &other) const;
+  Vec2d operator-(const Vec2d &other) const;///< 减法运算符
 
   //! Multiplies Vec2d by a scalar
   Vec2d operator*(const double ratio) const;

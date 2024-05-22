@@ -63,7 +63,7 @@ class Double {
 
  private:
   double value_ = 0.0;
-  static constexpr double kEpsilon_ = std::numeric_limits<double>::epsilon();
+  static constexpr double kEpsilon_ = std::numeric_limits<double>::epsilon();///< 最小正数
   static bool ApproximatelyEqual(double a, double b, double epsilon);
   static bool EssentiallyEqual(double a, double b, double epsilon);
   static bool DefinitelyGreaterThan(double a, double b, double epsilon);

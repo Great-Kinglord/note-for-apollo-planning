@@ -149,17 +149,22 @@ void StBoundary::CalculateArea() {
   }
   area_ *= 0.5;///? 为什么乘以0.5
 }
-
+/// @brief 
+/// @param st_point 
+/// @return 
 bool StBoundary::IsPointInBoundary(const STPoint& st_point) const {
+  ///t超出范围不考虑
   if (st_point.t() <= min_t_ || st_point.t() >= max_t_) {
     return false;
   }
   size_t left = 0;
   size_t right = 0;
+  ///根据t值找到lower_points_中的左右的端点的索引
   if (!GetIndexRange(lower_points_, st_point.t(), &left, &right)) {
     AERROR << "fait to get index range.";
     return false;
   }
+  ///通过叉乘判断是否在边界内
   const double check_upper = common::math::CrossProd(
       st_point, upper_points_[left], upper_points_[right]);
   const double check_lower = common::math::CrossProd(
@@ -316,10 +321,12 @@ bool StBoundary::GetBoundarySRange(const double curr_time, double* s_upper,
 
   size_t left = 0;
   size_t right = 0;
+  ///获取索引
   if (!GetIndexRange(lower_points_, curr_time, &left, &right)) {
     AERROR << "Fail to get index range.";
     return false;
   }
+  ///插值
   const double r = (curr_time - upper_points_[left].t()) /
                    (upper_points_[right].t() - upper_points_[left].t());
 
@@ -328,7 +335,7 @@ bool StBoundary::GetBoundarySRange(const double curr_time, double* s_upper,
   *s_lower = lower_points_[left].s() +
              r * (lower_points_[right].s() - lower_points_[left].s());
 
-  *s_upper = std::fmin(*s_upper, s_high_limit_);
+  *s_upper = std::fmin(*s_upper, s_high_limit_);///< s_high_limit_ = 200
   *s_lower = std::fmax(*s_lower, 0.0);
   return true;
 }
@@ -340,6 +347,7 @@ double StBoundary::DistanceS(const STPoint& st_point) const {
     constexpr double kMaxDistance = 1.0e10;
     return kMaxDistance;
   }
+  ///找不到索引,s_upper,s_lower就会等于0
   if (st_point.s() < s_lower) {
     return s_lower - st_point.s();
   } else if (st_point.s() > s_upper) {
@@ -357,19 +365,19 @@ double StBoundary::max_t() const { return max_t_; }
 bool StBoundary::GetIndexRange(const std::vector<STPoint>& points,
                                const double t, size_t* left,
                                size_t* right) const {
-  CHECK_NOTNULL(left);
+  CHECK_NOTNULL(left);///<判断空，则终止程序
   CHECK_NOTNULL(right);
   if (t < points.front().t() || t > points.back().t()) {
     AERROR << "t is out of range. t = " << t;
     return false;
   }
   auto comp = [](const STPoint& p, const double t) { return p.t() < t; };
-  auto first_ge = std::lower_bound(points.begin(), points.end(), t, comp);
-  size_t index = std::distance(points.begin(), first_ge);
+  auto first_ge = std::lower_bound(points.begin(), points.end(), t, comp);///< 找到第一个大于等于t的元素
+  size_t index = std::distance(points.begin(), first_ge); ///< 得到一个索引
   if (index == 0) {
-    *left = *right = 0;
+    *left = *right = 0;///<第一个索引
   } else if (first_ge == points.end()) {
-    *left = *right = points.size() - 1;
+    *left = *right = points.size() - 1;///<最后一个索引
   } else {
     *left = index - 1;
     *right = index;
