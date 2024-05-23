@@ -25,9 +25,9 @@
 namespace apollo {
 namespace planning {
 
-std::uint32_t StGraphPoint::index_s() const { return index_s_; }
+std::uint32_t StGraphPoint::index_s() const { return index_s_; } ///<返回s的索引
 
-std::uint32_t StGraphPoint::index_t() const { return index_t_; }
+std::uint32_t StGraphPoint::index_t() const { return index_t_; } ///<返回t的索引
 
 const STPoint& StGraphPoint::point() const { return point_; }
 

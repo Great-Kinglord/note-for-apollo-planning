@@ -43,7 +43,11 @@ using apollo::common::VehicleConfigHelper;
 using apollo::common::VehicleParam;
 
 namespace {
-
+/// @brief 
+/// @param boundaries 
+/// @param p1 
+/// @param p2 
+/// @return 
 bool CheckOverlapOnDpStGraph(const std::vector<StBoundary>& boundaries,
                              const StGraphPoint& p1, const StGraphPoint& p2) {
   for (const auto& boundary : boundaries) {
@@ -164,14 +168,14 @@ void DpStGraph::CalculatePointwiseCost(
 }
 
 Status DpStGraph::CalculateTotalCost() {
-  // s corresponding to row
-  // time corresponding to col
+  // s corresponding to row    行
+  // time corresponding to col 列
   uint32_t next_highest_row = 0;
   uint32_t next_lowest_row = 0;
 
-  for (size_t c = 0; c < cost_table_.size(); ++c) {
+  for (size_t c = 0; c < cost_table_.size(); ++c) { ///< 列，就是时间t
     uint32_t highest_row = 0;
-    uint32_t lowest_row = cost_table_.back().size() - 1;
+    uint32_t lowest_row = cost_table_.back().size() - 1; ///< 行，就是s
     for (uint32_t r = next_lowest_row; r <= next_highest_row; ++r) {
       const auto& cost_cr = cost_table_[c][r];
       CalculateCostAt(c, r);
@@ -216,10 +220,13 @@ void DpStGraph::GetRowRange(const StGraphPoint& point,
     *next_lowest_row = cost_table_.back().size() - 1;
   }
 }
-
+/// @brief 在st图上某个索引出的点计算cost
+/// @param c 列 对应t
+/// @param r 行 对应s
 void DpStGraph::CalculateCostAt(const uint32_t c, const uint32_t r) {
   auto& cost_cr = cost_table_[c][r];
   const auto& cost_init = cost_table_[0][0];
+  /// [0 0]是可以的，但是列是0，行不能是0
   if (c == 0) {
     DCHECK_EQ(r, 0) << "Incorrect. Row should be 0 with col = 0. row: " << r;
     cost_cr.SetTotalCost(0.0);
@@ -227,35 +234,39 @@ void DpStGraph::CalculateCostAt(const uint32_t c, const uint32_t r) {
   }
 
   double speed_limit =
-      st_graph_data_.speed_limit().GetSpeedLimitByS(unit_s_ * r);
+      st_graph_data_.speed_limit().GetSpeedLimitByS(unit_s_ * r);///<获取s处的速度限制
+  /// 对应第一列，c=1需要单独处理，因为c=0的1列只有1个节点，即初始节点
   if (c == 1) {
-    if (CheckOverlapOnDpStGraph(st_graph_data_.st_boundaries(), cost_cr,
-                                cost_init)) {
+    ///如果从起点到当前点有障碍物，那么直接返回，不计算cost
+    if (CheckOverlapOnDpStGraph(st_graph_data_.st_boundaries(), cost_cr, cost_init)) {
       return;
     }
+    ///和障碍物没有重叠，计算cost，点内cost,点间cost，从起点到[c=1,r]的各项cost，即[t0,s0]->[t1,sn]的cost
     cost_cr.SetTotalCost(cost_cr.obstacle_cost() + cost_init.total_cost() +
                          CalculateEdgeCostForSecondCol(r, speed_limit));
     cost_cr.SetPrePoint(cost_init);
     return;
   }
-
+  /// c>1的情况，计算cost
   const uint32_t max_s_diff = static_cast<uint32_t>(
-      dp_st_speed_config_.max_speed() * unit_t_ / unit_s_);
+      dp_st_speed_config_.max_speed() * unit_t_ / unit_s_);///< 速度*时间/位移，单位时间，最大s的delta索引,max_speed = 20m/s
+  /// 缩小行范围到[r_low, r],大部分应该就是[0,r]
   const uint32_t r_low = (max_s_diff < r ? r - max_s_diff : 0);
 
   const auto& pre_col = cost_table_[c - 1];
-
+  ///对应第二列,由于计算jerk需要三个点，c = 2那第一个点就是车辆的初始点
   if (c == 2) {
     for (uint32_t r_pre = r_low; r_pre <= r; ++r_pre) {
+      ///上一列和当前列的点有碰撞，直接返回，cost_cr为[2][r]
       if (CheckOverlapOnDpStGraph(st_graph_data_.st_boundaries(), cost_cr,
                                   pre_col[r_pre])) {
-        return;
+        return; ///! 应该是continue,而不是return
       }
-
+      ///没有碰撞，计算cost，当前cost + 上个点的cost
       const double cost = cost_cr.obstacle_cost() +
                           pre_col[r_pre].total_cost() +
                           CalculateEdgeCostForThirdCol(r, r_pre, speed_limit);
-
+      ///在未赋有效cost值之前，cost_cr的total_cost是+inf
       if (cost < cost_cr.total_cost()) {
         cost_cr.SetTotalCost(cost);
         cost_cr.SetPrePoint(pre_col[r_pre]);
@@ -263,16 +274,17 @@ void DpStGraph::CalculateCostAt(const uint32_t c, const uint32_t r) {
     }
     return;
   }
-  for (uint32_t r_pre = r_low; r_pre <= r; ++r_pre) {
+
+  for (uint32_t r_pre = r_low; r_pre <= r; ++r_pre) { ///< [0 r]
+    ///上个点不可达
     if (std::isinf(pre_col[r_pre].total_cost()) ||
         pre_col[r_pre].pre_point() == nullptr) {
       continue;
     }
-
+    ///当前加速度，超出范围，直接跳过，当前点和上个点之间是匀速，上个点和上上个点之间也是匀速，求两个匀速之间的加速度
     const double curr_a =
         (cost_cr.index_s() + pre_col[r_pre].pre_point()->index_s() -
-         2 * pre_col[r_pre].index_s()) *
-        unit_s_ / (unit_t_ * unit_t_);
+         2 * pre_col[r_pre].index_s()) * unit_s_ / (unit_t_ * unit_t_);
     if (curr_a > vehicle_param_.max_acceleration() ||
         curr_a < vehicle_param_.max_deceleration()) {
       continue;
@@ -584,8 +596,8 @@ double DpStGraph::CalculateEdgeCost(const STPoint& first, const STPoint& second,
 
 double DpStGraph::CalculateEdgeCostForSecondCol(
     const uint32_t row, const double speed_limit) const {
-  double init_speed = init_point_.v();
-  double init_acc = init_point_.a();
+  double init_speed = init_point_.v();///<初始速度
+  double init_acc = init_point_.a();///<初始加速度
   const STPoint& pre_point = cost_table_[0][0].point();
   const STPoint& curr_point = cost_table_[1][row].point();
   return dp_st_cost_.GetSpeedCost(pre_point, curr_point, speed_limit) +

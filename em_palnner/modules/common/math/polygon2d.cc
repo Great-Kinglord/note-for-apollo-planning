@@ -348,13 +348,17 @@ bool Polygon2d::HasOverlap(const LineSegment2d &line_segment) const {
   Vec2d last;
   return GetOverlap(line_segment, &first, &last);
 }
-
+/// @brief 计算一个线段与多边形的重叠部分
+/// @param line_segment 
+/// @param first 
+/// @param last 
+/// @return 
 bool Polygon2d::GetOverlap(const LineSegment2d &line_segment,
                            Vec2d *const first, Vec2d *const last) const {
   CHECK_GE(points_.size(), 3);
   CHECK_NOTNULL(first);
   CHECK_NOTNULL(last);
-
+  /// 如果线段长度小于一个极小值,则判断起点是不是在多边形内部
   if (line_segment.length() <= kMathEpsilon) {
     if (!IsPointIn(line_segment.start())) {
       return false;
@@ -364,19 +368,23 @@ bool Polygon2d::GetOverlap(const LineSegment2d &line_segment,
     return true;
   }
 
-  double min_proj = line_segment.length();
-  double max_proj = 0;
+  double min_proj = line_segment.length(); ///< 最小投影
+  double max_proj = 0;///< 最大投影
+  /// 如果线段的起点在多边形内部
   if (IsPointIn(line_segment.start())) {
     *first = line_segment.start();
-    min_proj = 0.0;
+    min_proj = 0.0; ///< 表示一定会有投影长度
   }
+  /// 如果线段的终点在多边形内部
   if (IsPointIn(line_segment.end())) {
     *last = line_segment.end();
     max_proj = line_segment.length();
   }
   for (const auto &poly_seg : line_segments_) {
     Vec2d pt;
+    /// 如果线段与多边形的某一条边相交，得到交点信息pt
     if (poly_seg.GetIntersect(line_segment, &pt)) {
+      ///有交点,计算投影
       const double proj = line_segment.ProjectOntoUnit(pt);
       if (proj < min_proj) {
         min_proj = proj;

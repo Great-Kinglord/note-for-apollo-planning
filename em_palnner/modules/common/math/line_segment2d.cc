@@ -41,6 +41,9 @@ bool IsWithin(double val, double bound1, double bound2) {
 
 LineSegment2d::LineSegment2d() { unit_direction_ = Vec2d(1, 0); }
 
+/// @brief 构造函数，计算线段的长度，单位向量，heading
+/// @param start 
+/// @param end 
 LineSegment2d::LineSegment2d(const Vec2d &start, const Vec2d &end)
     : start_(start), end_(end) {
   const double dx = end_.x() - start_.x();
@@ -136,14 +139,17 @@ double LineSegment2d::DistanceSquareTo(const Vec2d &point,
 }
 
 bool LineSegment2d::IsPointIn(const Vec2d &point) const {
+  ///线段长度为0，就是一个点
   if (length_ <= kMathEpsilon) {
     return std::abs(point.x() - start_.x()) <= kMathEpsilon &&
            std::abs(point.y() - start_.y()) <= kMathEpsilon;
   }
   const double prod = CrossProd(point, start_, end_);
+  ///叉乘结果不为0，说明不在一条直线上
   if (std::abs(prod) > kMathEpsilon) {
     return false;
   }
+  ///点不能超出线段的两头
   return IsWithin(point.x(), start_.x(), end_.x()) &&
          IsWithin(point.y(), start_.y(), end_.y());
 }
@@ -160,18 +166,24 @@ bool LineSegment2d::HasIntersect(const LineSegment2d &other_segment) const {
   Vec2d point;
   return GetIntersect(other_segment, &point);
 }
-
+/// @brief 找出线段的交点
+/// @param other_segment 
+/// @param point 
+/// @return 
 bool LineSegment2d::GetIntersect(const LineSegment2d &other_segment,
                                  Vec2d *const point) const {
   CHECK_NOTNULL(point);
+  ///起点是否在另一条线段上
   if (IsPointIn(other_segment.start())) {
-    *point = other_segment.start();
+    *point = other_segment.start();///<起点就是交点
     return true;
   }
+  ///终点是否在另一条线段上
   if (IsPointIn(other_segment.end())) {
-    *point = other_segment.end();
+    *point = other_segment.end();///<终点就是交点
     return true;
   }
+  ///交点还可能是另一条线的两个端点
   if (other_segment.IsPointIn(start_)) {
     *point = start_;
     return true;
@@ -180,11 +192,13 @@ bool LineSegment2d::GetIntersect(const LineSegment2d &other_segment,
     *point = end_;
     return true;
   }
+  ///线段长度为0，认为是一个点没有交点
   if (length_ <= kMathEpsilon || other_segment.length() <= kMathEpsilon) {
     return false;
   }
   const double cc1 = CrossProd(start_, end_, other_segment.start());
   const double cc2 = CrossProd(start_, end_, other_segment.end());
+  ///一个线段的两个点在另一条线段的同侧，那么两条线段不相交
   if (cc1 * cc2 >= -kMathEpsilon) {
     return false;
   }
@@ -193,8 +207,10 @@ bool LineSegment2d::GetIntersect(const LineSegment2d &other_segment,
   const double cc4 =
       CrossProd(other_segment.start(), other_segment.end(), end_);
   if (cc3 * cc4 >= -kMathEpsilon) {
+    ///两条线段不相交
     return false;
   }
+
   const double ratio = cc4 / (cc4 - cc3);
   *point = Vec2d(start_.x() * ratio + end_.x() * (1.0 - ratio),
                  start_.y() * ratio + end_.y() * (1.0 - ratio));

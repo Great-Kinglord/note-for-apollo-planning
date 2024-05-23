@@ -64,33 +64,43 @@ double DpStCost::GetReferenceCost(const STPoint& point,
          (point.s() - reference_point.s()) * (point.s() - reference_point.s()) * unit_t_;///<权重*(实际位置-参考位置)^2 * 单位时间
 }
 
+/// @brief 速度cost，速度超过限制，或者速度太低，都会有cost
+/// @param first 上一点
+/// @param second 当前点
+/// @param speed_limit 限速
+/// @return 
 double DpStCost::GetSpeedCost(const STPoint& first, const STPoint& second,
                               const double speed_limit) const {
   double cost = 0.0;
-  const double speed = (second.s() - first.s()) / unit_t_;
+  const double speed = (second.s() - first.s()) / unit_t_;///< delta_s / delta_t = v
   if (Double::Compare(speed, 0.0) < 0) {
-    return std::numeric_limits<double>::infinity();
+    return std::numeric_limits<double>::infinity();///<速度小于0，cost设置为无穷大,不准往回走
   }
-  double det_speed = (speed - speed_limit) / speed_limit;
+  double det_speed = (speed - speed_limit) / speed_limit;///<超过限速的百分比
   if (Double::Compare(det_speed, 0.0) > 0) {
+    ///10 * 1.0 * 速度^2 * 单位时间 优先级最低
     cost = dp_st_speed_config_.exceed_speed_penalty() *
            dp_st_speed_config_.default_speed_cost() * fabs(speed * speed) *
            unit_t_;
   } else if (Double::Compare(det_speed, 0.0) < 0) {
+    ///2.5 * 1.0 * 速度^2 * -det_speed * 单位时间，看起来是第二优先
     cost = dp_st_speed_config_.low_speed_penalty() *
            dp_st_speed_config_.default_speed_cost() * -det_speed * unit_t_;
   } else {
+    ///速度等于限速，这是最优先的
     cost = 0.0;
   }
   return cost;
 }
-
+/// @brief 获取加速度cost
+/// @param accel 
+/// @return 
 double DpStCost::GetAccelCost(const double accel) const {
   const double accel_sq = accel * accel;
-  double max_acc = dp_st_speed_config_.max_acceleration();
-  double max_dec = dp_st_speed_config_.max_deceleration();
-  double accel_penalty = dp_st_speed_config_.accel_penalty();
-  double decel_penalty = dp_st_speed_config_.decel_penalty();
+  double max_acc = dp_st_speed_config_.max_acceleration(); ///<最大加速度，可以4.5，可以2.0，可标定
+  double max_dec = dp_st_speed_config_.max_deceleration(); ///<最大减速度，可以-6，可以-4.5，可标定
+  double accel_penalty = dp_st_speed_config_.accel_penalty(); ///<加速度惩罚，2.0，可标定
+  double decel_penalty = dp_st_speed_config_.decel_penalty(); ///<减速度惩罚，2.0，可标定
   double cost = 0.0;
   if (accel > 0.0) {
     cost = accel_penalty * accel_sq;
@@ -110,12 +120,16 @@ double DpStCost::GetAccelCostByThreePoints(const STPoint& first,
   double accel = (first.s() + third.s() - 2 * second.s()) / (unit_t_ * unit_t_);
   return GetAccelCost(accel);
 }
-
+/// @brief 加速度cost，根据两个点的速度和位置，计算加速度，然后计算cost
+/// @param pre_speed 
+/// @param pre_point 
+/// @param curr_point 
+/// @return 
 double DpStCost::GetAccelCostByTwoPoints(const double pre_speed,
                                          const STPoint& pre_point,
                                          const STPoint& curr_point) const {
   double current_speed = (curr_point.s() - pre_point.s()) / unit_t_;
-  double accel = (current_speed - pre_speed) / unit_t_;
+  double accel = (current_speed - pre_speed) / unit_t_; ///<(v1 - v0) / t = a
   return GetAccelCost(accel);
 }
 
@@ -124,10 +138,11 @@ double DpStCost::JerkCost(const double jerk) const {
   double cost = 0.0;
   const auto diff = Double::Compare(jerk, 0.0);
   if (diff > 0) {
-    cost = dp_st_speed_config_.positive_jerk_coeff() * jerk_sq * unit_t_;
+    cost = dp_st_speed_config_.positive_jerk_coeff() * jerk_sq * unit_t_; ///<positive_jerk_coeff = 1.0
   } else if (diff < 0) {
-    cost = dp_st_speed_config_.negative_jerk_coeff() * jerk_sq * unit_t_;
+    cost = dp_st_speed_config_.negative_jerk_coeff() * jerk_sq * unit_t_;///<negative_jerk_coeff = 300
   }
+  ///优先jerk = 0，其次正jerk，最后负jerk
   return cost;
 }
 
@@ -146,7 +161,7 @@ double DpStCost::GetJerkCostByTwoPoints(const double pre_speed,
                                         const STPoint& curr_point) const {
   const double curr_speed = (curr_point.s() - pre_point.s()) / unit_t_;
   const double curr_accel = (curr_speed - pre_speed) / unit_t_;
-  const double jerk = (curr_accel - pre_acc) / unit_t_;
+  const double jerk = (curr_accel - pre_acc) / unit_t_; ///< 算加加速度
   return JerkCost(jerk);
 }
 
