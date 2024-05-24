@@ -97,7 +97,7 @@ Status DpStGraph::Search(PathDecision* const path_decision,
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
-
+  ///找到最佳的速度profile
   if (!RetrieveSpeedProfile(speed_data).ok()) {
     const std::string msg = "Retrieve best speed profile failed.";
     AERROR << msg;
@@ -181,8 +181,9 @@ Status DpStGraph::CalculateTotalCost() {
       CalculateCostAt(c, r);
       uint32_t h_r = 0;
       uint32_t l_r = 0;
+      ///小于无穷大，就是有效的cost
       if (cost_cr.total_cost() < std::numeric_limits<double>::infinity()) {
-        GetRowRange(cost_cr, &h_r, &l_r);
+        GetRowRange(cost_cr, &h_r, &l_r); ///< 获取下一个点的行范围
         highest_row = std::max(highest_row, h_r);
         lowest_row = std::min(lowest_row, l_r);
       }
@@ -198,23 +199,24 @@ void DpStGraph::GetRowRange(const StGraphPoint& point,
                             uint32_t* next_highest_row,
                             uint32_t* next_lowest_row) {
   double v0 = 0.0;
-  if (!point.pre_point()) {
+  if (!point.pre_point()) { ///< 没有前一个点，自己就是初始点
     v0 = init_point_.v();
   } else {
-    v0 = (point.index_s() - point.pre_point()->index_s()) * unit_s_ / unit_t_;
+    v0 = (point.index_s() - point.pre_point()->index_s()) * unit_s_ / unit_t_; ///< 速度 = 位移/时间
   }
   const double speed_coeff = unit_t_ * unit_t_;
 
   const double delta_s_upper_bound =
-      v0 * unit_t_ + vehicle_param_.max_acceleration() * speed_coeff;
+      v0 * unit_t_ + vehicle_param_.max_acceleration() * speed_coeff; ///< delat位移上限
   *next_highest_row =
-      point.index_s() + static_cast<uint32_t>(delta_s_upper_bound / unit_s_);
+      point.index_s() + static_cast<uint32_t>(delta_s_upper_bound / unit_s_);///< 下一个点上限的索引
   if (*next_highest_row >= cost_table_.back().size()) {
     *next_highest_row = cost_table_.back().size() - 1;
   }
 
   const double delta_s_lower_bound = std::fmax(
-      0.0, v0 * unit_t_ + vehicle_param_.max_deceleration() * speed_coeff);
+      0.0, v0 * unit_t_ + vehicle_param_.max_deceleration() * speed_coeff);///< 车辆不能后退
+  ///!是不是应该*next_lowest_row = point.index_s() + static_cast<int32_t>(delta_s_lower_bound / unit_s_);
   *next_lowest_row += static_cast<int32_t>(delta_s_lower_bound / unit_s_);
   if (*next_lowest_row >= cost_table_.back().size()) {
     *next_lowest_row = cost_table_.back().size() - 1;
@@ -250,7 +252,7 @@ void DpStGraph::CalculateCostAt(const uint32_t c, const uint32_t r) {
   /// c>1的情况，计算cost
   const uint32_t max_s_diff = static_cast<uint32_t>(
       dp_st_speed_config_.max_speed() * unit_t_ / unit_s_);///< 速度*时间/位移，单位时间，最大s的delta索引,max_speed = 20m/s
-  /// 缩小行范围到[r_low, r],大部分应该就是[0,r]
+  /// 缩小行范围到[r_low, r]，是缩小上一点的范围，当前点根据速度限值去找上一个点的范围
   const uint32_t r_low = (max_s_diff < r ? r - max_s_diff : 0);
 
   const auto& pre_col = cost_table_[c - 1];
@@ -292,30 +294,32 @@ void DpStGraph::CalculateCostAt(const uint32_t c, const uint32_t r) {
 
     uint32_t lower_bound = 0;
     uint32_t upper_bound = 0;
+    ///缩小上上点的范围，正就是根据加速度来限值，上个点是通过速度来限值
     if (!CalculateFeasibleAccelRange(static_cast<double>(r_pre),
-                                     static_cast<double>(r), &lower_bound,
-                                     &upper_bound)) {
+                                     static_cast<double>(r), &lower_bound, &upper_bound)) {
       continue;
     }
-
+    ///和障碍物位置相交不可行驶
     if (CheckOverlapOnDpStGraph(st_graph_data_.st_boundaries(), cost_cr,
                                 pre_col[r_pre])) {
-      return;
+      return; ///! 应该是continue,而不是return
     }
-
+    ///遍历上上个点的范围，计算cost
     for (uint32_t r_prepre = lower_bound; r_prepre <= upper_bound; ++r_prepre) {
       const StGraphPoint& prepre_graph_point = cost_table_[c - 2][r_prepre];
-      if (std::isinf(prepre_graph_point.total_cost())) {
+      if (std::isinf(prepre_graph_point.total_cost())) {///<此点不存在
         continue;
       }
 
       if (!prepre_graph_point.pre_point()) {
         continue;
       }
+      ///连个点只能计算速度，三个点可以计算加速度，四个点才可以计算jerk
       const STPoint& triple_pre_point = prepre_graph_point.pre_point()->point();
       const STPoint& prepre_point = prepre_graph_point.point();
       const STPoint& pre_point = pre_col[r_pre].point();
       const STPoint& curr_point = cost_cr.point();
+      ///triple_pre_point和prepre_point只是计算jerk cost需要
       double cost = cost_cr.obstacle_cost() + pre_col[r_pre].total_cost() +
                     CalculateEdgeCost(triple_pre_point, prepre_point, pre_point,
                                       curr_point, speed_limit);
@@ -327,17 +331,23 @@ void DpStGraph::CalculateCostAt(const uint32_t c, const uint32_t r) {
     }
   }
 }
-
+/// @brief 通过加减速计算可行驶的区域，上上个点的范围
+/// @param r_pre 
+/// @param r_cur 
+/// @param lower_bound 上上个点的索引下限
+/// @param upper_bound 上上个点的索引上限
+/// @return 
 bool DpStGraph::CalculateFeasibleAccelRange(const double r_pre,
                                             const double r_cur,
                                             uint32_t* const lower_bound,
                                             uint32_t* const upper_bound) const {
   double tcoef = unit_t_ * unit_t_ / unit_s_;
+  ///完全正确
   double lval = std::max(
-      2 * r_pre - r_cur + dp_st_speed_config_.max_deceleration() * tcoef, 0.0);
+      2 * r_pre - r_cur + dp_st_speed_config_.max_deceleration() * tcoef, 0.0);///< max_deceleration,可标，-6
+  ///pre到cur是匀速，通过加减速阈值，得到cur上下范围，
   double rval = std::min(
-      2 * r_pre - r_cur + dp_st_speed_config_.max_acceleration() * tcoef,
-      r_pre);
+      2 * r_pre - r_cur + dp_st_speed_config_.max_acceleration() * tcoef, r_pre);///< max_acceleration,可标，2
 
   if (rval < lval) {
     return false;
@@ -346,10 +356,13 @@ bool DpStGraph::CalculateFeasibleAccelRange(const double r_pre,
   *upper_bound = static_cast<uint32_t>(rval);
   return true;
 }
-
+/// @brief 寻找到最佳的速度profile
+/// @param speed_data 
+/// @return 
 Status DpStGraph::RetrieveSpeedProfile(SpeedData* const speed_data) const {
   double min_cost = std::numeric_limits<double>::infinity();
   const StGraphPoint* best_end_point = nullptr;
+  ///搜索最后t时间的s，搜索s
   for (const StGraphPoint& cur_point : cost_table_.back()) {
     if (!std::isinf(cur_point.total_cost()) &&
         cur_point.total_cost() < min_cost) {
@@ -357,7 +370,7 @@ Status DpStGraph::RetrieveSpeedProfile(SpeedData* const speed_data) const {
       min_cost = cur_point.total_cost();
     }
   }
-
+  ///最后一个点可能不是落在最后的时间t列,也有可能在最大s行，搜索t
   for (const auto& row : cost_table_) {
     const StGraphPoint& cur_point = row.back();
     if (!std::isinf(cur_point.total_cost()) &&
@@ -375,6 +388,7 @@ Status DpStGraph::RetrieveSpeedProfile(SpeedData* const speed_data) const {
 
   std::vector<SpeedPoint> speed_profile;
   const StGraphPoint* cur_point = best_end_point;
+  ///回溯出完整的st
   while (cur_point != nullptr) {
     SpeedPoint speed_point;
     speed_point.set_s(cur_point->point().s());
@@ -382,8 +396,8 @@ Status DpStGraph::RetrieveSpeedProfile(SpeedData* const speed_data) const {
     speed_profile.emplace_back(speed_point);
     cur_point = cur_point->pre_point();
   }
-  std::reverse(speed_profile.begin(), speed_profile.end());
-
+  std::reverse(speed_profile.begin(), speed_profile.end());///<顺序颠倒下
+  ///第一个点就是初始点，t和s都是0
   if (Double::Compare(speed_profile.front().t(), 0.0) != 0 ||
       Double::Compare(speed_profile.front().s(), 0.0) != 0) {
     const std::string msg = "Fail to retrieve speed profile.";
@@ -393,22 +407,27 @@ Status DpStGraph::RetrieveSpeedProfile(SpeedData* const speed_data) const {
   speed_data->set_speed_vector(speed_profile);
   return Status::OK();
 }
-
+/// @brief 给障碍物做决策标签
+/// @param speed_profile 
+/// @param path_decision 
+/// @return 
 Status DpStGraph::MakeObjectDecision(const SpeedData& speed_profile,
                                      PathDecision* const path_decision) const {
+  ///速度profile的点数小于2，失败
   if (speed_profile.speed_vector().size() < 2) {
     const std::string msg = "dp_st_graph failed to get speed profile.";
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
-
+  ///目标在后方或者最大预测时间小于0，不需要做决策
   for (const auto& boundary : st_graph_data_.st_boundaries()) {
     if (boundary.max_s() < 0.0 || boundary.max_t() < 0.0) {
       continue;
     }
 
-    auto* path_obstacle = path_decision->Find(boundary.id());
+    auto* path_obstacle = path_decision->Find(boundary.id());///<通过ID找到障碍物
     CHECK(path_obstacle) << "Failed to find obstacle " << boundary.id();
+    ///已经有决策了，跳过
     if (path_obstacle->HasLongitudinalDecision()) {
       continue;
     }
@@ -417,6 +436,7 @@ Status DpStGraph::MakeObjectDecision(const SpeedData& speed_profile,
     double end_t = boundary.max_t();
 
     bool go_down = true;
+    ///遍历速度profile的点
     for (const auto& speed_point : speed_profile.speed_vector()) {
       if (speed_point.t() < start_t) {
         continue;
@@ -426,6 +446,7 @@ Status DpStGraph::MakeObjectDecision(const SpeedData& speed_profile,
       }
 
       STPoint st_point(speed_point.s(), speed_point.t());
+      ///点在目标boundary内，这是有碰撞风险的
       if (boundary.IsPointInBoundary(st_point)) {
         const std::string msg =
             "dp_st_graph failed: speed profile cross st_boundaries.";
@@ -433,19 +454,23 @@ Status DpStGraph::MakeObjectDecision(const SpeedData& speed_profile,
         return Status(ErrorCode::PLANNING_ERROR, msg);
       }
 
-      double s_upper = dp_st_speed_config_.total_path_length();
+      double s_upper = dp_st_speed_config_.total_path_length(); ///< 80m，标定量
       double s_lower = 0.0;
+      ///在该t的时候，看boundary的s范围
       if (boundary.GetBoundarySRange(speed_point.t(), &s_upper, &s_lower)) {
         if (s_lower > speed_point.s()) {
+          ///规划的速度在障碍物此时s的下方，表示减速让行或者跟车
           go_down = true;
         } else if (s_upper < speed_point.s()) {
           go_down = false;
         }
       }
     }
+    ///规划的速度在障碍物此时s的下方
     if (go_down) {
+      ///先检查目标在这个boundary是否正常
       if (CheckIsFollowByT(boundary)) {
-        // FOLLOW decision
+        ///跟车决策
         ObjectDecisionType follow_decision;
         if (!CreateFollowDecision(*path_obstacle, boundary, &follow_decision)) {
           AERROR << "Failed to create follow decision for boundary with id "
@@ -453,6 +478,7 @@ Status DpStGraph::MakeObjectDecision(const SpeedData& speed_profile,
           return Status(ErrorCode::PLANNING_ERROR,
                         "faind to create follow decision");
         }
+        ///更新决策
         if (!path_decision->AddLongitudinalDecision(
                 "dp_st_graph", boundary.id(), follow_decision)) {
           AERROR << "Failed to add follow decision to object " << boundary.id();
@@ -460,7 +486,7 @@ Status DpStGraph::MakeObjectDecision(const SpeedData& speed_profile,
                         "faind to add follow decision");
         }
       } else {
-        // YIELD decision
+        ///车辆对对向来车，或者静止，让行，应该就是停车的意思
         ObjectDecisionType yield_decision;
         if (!CreateYieldDecision(boundary, &yield_decision)) {
           AERROR << "Failed to create yield decision for boundary with id "
@@ -476,7 +502,7 @@ Status DpStGraph::MakeObjectDecision(const SpeedData& speed_profile,
         }
       }
     } else {
-      // OVERTAKE decision
+      ///超车
       ObjectDecisionType overtake_decision;
       if (!CreateOvertakeDecision(*path_obstacle, boundary,
                                   &overtake_decision)) {
@@ -494,6 +520,7 @@ Status DpStGraph::MakeObjectDecision(const SpeedData& speed_profile,
     }
   }
   for (const auto* path_obstacle : path_decision->path_obstacles().Items()) {
+    ///没有决策，忽略
     if (!path_obstacle->HasLongitudinalDecision()) {
       ObjectDecisionType ignore_decision;
       ignore_decision.mutable_ignore();
@@ -509,9 +536,10 @@ bool DpStGraph::CreateFollowDecision(
     ObjectDecisionType* const follow_decision) const {
   DCHECK_NOTNULL(follow_decision);
 
-  auto* follow = follow_decision->mutable_follow();
+  auto* follow = follow_decision->mutable_follow();///< proto自动生成mutable_
 
   const double follow_speed = init_point_.v();
+  ///跟车距离follow_time_buffer：4.0 follow_min_distance：10m，或者4s*车速的距离
   const double follow_distance_s = -std::fmax(
       follow_speed * FLAGS_follow_time_buffer, FLAGS_follow_min_distance);
 

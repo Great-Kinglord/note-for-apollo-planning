@@ -325,12 +325,15 @@ void PathObstacle::AddLongitudinalDecision(const std::string& decider_tag,
   DCHECK(IsLongitudinalDecision(decision))
       << "Decision: " << decision.ShortDebugString()
       << " is not a longitudinal decision";
+
   longitudinal_decision_ =
       MergeLongitudinalDecision(longitudinal_decision_, decision);
+
   ADEBUG << decider_tag << " added obstacle " << Id()
          << " a longitudinal decision: " << decision.ShortDebugString()
          << ". The merged decision is: "
          << longitudinal_decision_.ShortDebugString();
+         
   decisions_.push_back(decision);
   decider_tags_.push_back(decider_tag);
 }
