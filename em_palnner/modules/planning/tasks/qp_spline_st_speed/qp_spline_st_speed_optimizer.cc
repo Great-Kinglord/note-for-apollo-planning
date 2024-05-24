@@ -51,6 +51,14 @@ bool QpSplineStSpeedOptimizer::Init(const PlanningConfig& config) {
   is_init_ = true;
   return true;
 }
+/*
+  * @brief 思想按时间采样N段，每一段速度轨迹采用多项式拟合，整体需要满足设定的各项约束条件，求取代价最小的多项式参数
+  * @param adc_sl_boundary 从reference_line_info中获取
+  * @param path_data 从reference_line_info中获取，就是mutable_path_data，横向规划完的结果
+  * @param init_point 从frame中获取
+  * @param reference_line 从reference_line_info中获取
+  * @param path_decision 从reference_line_info中获取
+*/
 
 Status QpSplineStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
                                          const PathData& path_data,
@@ -72,7 +80,7 @@ Status QpSplineStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
   StBoundaryMapper boundary_mapper(
       reference_line_info_->pnc_map(), adc_sl_boundary, st_boundary_config_,
       reference_line, path_data, qp_spline_st_speed_config_.total_path_length(),
-      qp_spline_st_speed_config_.total_time());
+      qp_spline_st_speed_config_.total_time());///< 默认长度80m，时间8s
 
   for (const auto* path_obstacle : path_decision->path_obstacles().Items()) {
     DCHECK(path_obstacle->HasLongitudinalDecision());
@@ -108,18 +116,19 @@ Status QpSplineStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
       frame_->DebugLogger()->mutable_planning_data()->add_st_graph();
 
   std::pair<double, double> accel_bound = {
-      qp_spline_st_speed_config_.preferred_min_deceleration(),
-      qp_spline_st_speed_config_.preferred_max_acceleration()};
+      qp_spline_st_speed_config_.preferred_min_deceleration(),///< -1.8
+      qp_spline_st_speed_config_.preferred_max_acceleration()};///< 1.2
   st_graph.SetDebugLogger(st_graph_debug);
   auto ret = st_graph.Search(st_graph_data, speed_data, accel_bound);
+  ///进行了两次尝试
   if (ret != Status::OK()) {
     AERROR << "Failed to solve with ideal acceleration conditions. Use "
               "secondary choice instead.";
 
-    accel_bound.first = qp_spline_st_speed_config_.min_deceleration();
-    accel_bound.second = qp_spline_st_speed_config_.max_acceleration();
+    accel_bound.first = qp_spline_st_speed_config_.min_deceleration(); ///< -4.5
+    accel_bound.second = qp_spline_st_speed_config_.max_acceleration(); ///< 2.0
     ret = st_graph.Search(st_graph_data, speed_data, accel_bound);
-
+    /// 放宽加速度的上下限范围
     if (ret != Status::OK()) {
       std::string msg = common::util::StrCat(
           Name(), ":Failed to search graph with quadratic programming!");
