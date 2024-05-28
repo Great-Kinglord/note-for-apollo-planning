@@ -73,6 +73,8 @@ StBoundaryMapper::StBoundaryMapper(const hdmap::PncMap* pnc_map,
           common::VehicleConfigHelper::instance()->GetConfig().vehicle_param()),
       planning_distance_(planning_distance),
       planning_time_(planning_time) {}
+
+
 /// @brief 创建ST边界
 /// @param path_decision 
 /// @param st_boundaries 

@@ -58,6 +58,7 @@ bool QpSplineStSpeedOptimizer::Init(const PlanningConfig& config) {
   * @param init_point 从frame中获取
   * @param reference_line 从reference_line_info中获取
   * @param path_decision 从reference_line_info中获取
+  * 我的理解就是DP开辟凸空间，每个障碍物确认了决策标签，所以现在才进行QP规划
 */
 
 Status QpSplineStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
@@ -76,7 +77,7 @@ Status QpSplineStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
-
+  ///建立st图
   StBoundaryMapper boundary_mapper(
       reference_line_info_->pnc_map(), adc_sl_boundary, st_boundary_config_,
       reference_line, path_data, qp_spline_st_speed_config_.total_path_length(),
@@ -85,7 +86,7 @@ Status QpSplineStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
   for (const auto* path_obstacle : path_decision->path_obstacles().Items()) {
     DCHECK(path_obstacle->HasLongitudinalDecision());
   }
-  // step 1 get boundaries
+  ///! 第一步获取边界        
   std::vector<StBoundary> boundaries;
   if (boundary_mapper.GetGraphBoundary(*path_decision, &boundaries).code() ==
       ErrorCode::PLANNING_ERROR) {
@@ -99,7 +100,7 @@ Status QpSplineStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
   }
 
   SpeedLimit speed_limits;
-  if (boundary_mapper.GetSpeedLimits(&speed_limits) != Status::OK()) {
+  if (boundary_mapper.GetSpeedLimits(&speed_limits) != Status::OK()) {///< 不同s处对应的速度限制
     return Status(ErrorCode::PLANNING_ERROR,
                   "GetSpeedLimits for dp st speed optimizer failed!");
   }

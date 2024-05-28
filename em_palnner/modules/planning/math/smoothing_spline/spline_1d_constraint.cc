@@ -264,18 +264,21 @@ bool Spline1dConstraint::AddThirdDerivativeBoundary(
   return inequality_constraint_.AddConstraint(inequality_constraint,
                                               inequality_boundary);
 }
-
+/// @brief 增加点约束
+/// @param x 
+/// @param fx 
+/// @return 
 bool Spline1dConstraint::AddPointConstraint(const double x, const double fx) {
   std::uint32_t index = FindIndex(x);
   std::vector<double> power_x;
-  GeneratePowerX(x - x_knots_[index], spline_order_, &power_x);
+  GeneratePowerX(x - x_knots_[index], spline_order_, &power_x);///< 五次多项式的话，power_x是一个5维的向量，所有幂，就是插值的一次幂，到五次幂
   Eigen::MatrixXd equality_constraint =
-      Eigen::MatrixXd::Zero(1, (x_knots_.size() - 1) * spline_order_);
+      Eigen::MatrixXd::Zero(1, (x_knots_.size() - 1) * spline_order_);///<1 * (9*5)
   std::uint32_t index_offset = index * spline_order_;
   for (std::uint32_t i = 0; i < spline_order_; ++i) {
     equality_constraint(0, index_offset + i) = power_x[i];
   }
-  Eigen::MatrixXd equality_boundary(1, 1);
+  Eigen::MatrixXd equality_boundary(1, 1);///<1 * 1矩阵
   equality_boundary(0, 0) = fx;
   return AddEqualityConstraint(equality_constraint, equality_boundary);
 }
@@ -602,7 +605,10 @@ bool Spline1dConstraint::FilterConstraints(
   }
   return true;
 }
-
+/// @brief 
+/// @param x 
+/// @param order 
+/// @param power_x 
 void Spline1dConstraint::GeneratePowerX(
     const double x, const std::uint32_t order,
     std::vector<double>* const power_x) const {

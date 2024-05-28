@@ -45,7 +45,8 @@ QpSplineStGraph::QpSplineStGraph(
           qp_spline_st_speed_config_.number_of_discrete_graph_t()),
       t_evaluated_resolution_(
           qp_spline_st_speed_config_.total_time() /
-          qp_spline_st_speed_config_.number_of_evaluated_graph_t()) {
+          qp_splsine_st_speed_config_.number_of_evaluated_graph_t()) {
+  ///total_time:8s number_of_discrete_graph_t:10 number_of_evaluated_graph_t:10，我们在txt中看到是4
   Init();
 }
 
@@ -55,7 +56,7 @@ void QpSplineStGraph::Init() {
   for (uint32_t i = 0;
        i <= qp_spline_st_speed_config_.number_of_discrete_graph_t(); ++i) {
     t_knots_.push_back(curr_t);
-    curr_t += t_knots_resolution_;
+    curr_t += t_knots_resolution_; ///< +0.8s，如果是4的话，就是2s
   }
 
   // init evaluated t positions
@@ -63,7 +64,7 @@ void QpSplineStGraph::Init() {
   for (uint32_t i = 0;
        i <= qp_spline_st_speed_config_.number_of_evaluated_graph_t(); ++i) {
     t_evaluated_.push_back(curr_t);
-    curr_t += t_evaluated_resolution_;
+    curr_t += t_evaluated_resolution_;///< +0.8s，如果是4的话，就是2s
   }
 }
 
@@ -80,18 +81,19 @@ Status QpSplineStGraph::Search(const StGraphData& st_graph_data,
                                const std::pair<double, double>& accel_bound) {
   cruise_.clear();
 
-  // reset spline generator
+  // reset spline generator，这里reset用法改变智能指针的指向，它会先销毁原来的对象（如果有的话），然后指向新的对象
   spline_generator_.reset(new Spline1dGenerator(
-      t_knots_, qp_spline_st_speed_config_.spline_order()));
+      t_knots_, qp_spline_st_speed_config_.spline_order()));///? spline_order因该是五次多项式，但是默认6，应该是5
 
   // start to search for best st points
   init_point_ = st_graph_data.init_point();
+  ///规划的路径长度小于80m的话，就是上限就是80m
   if (st_graph_data.path_data_length() <
       qp_spline_st_speed_config_.total_path_length()) {
     qp_spline_st_speed_config_.set_total_path_length(
         st_graph_data.path_data_length());
   }
-
+  ///约束
   if (!ApplyConstraint(st_graph_data.init_point(), st_graph_data.speed_limit(),
                        st_graph_data.st_boundaries(), accel_bound)
            .ok()) {
@@ -131,27 +133,33 @@ Status QpSplineStGraph::Search(const StGraphData& st_graph_data,
 
   return Status::OK();
 }
-
+/// @brief 添加约束
+/// @param init_point 
+/// @param speed_limit 
+/// @param boundaries 
+/// @param accel_bound 
+/// @return 
 Status QpSplineStGraph::ApplyConstraint(
     const common::TrajectoryPoint& init_point, const SpeedLimit& speed_limit,
     const std::vector<StBoundary>& boundaries,
     const std::pair<double, double>& accel_bound) {
   Spline1dConstraint* constraint =
       spline_generator_->mutable_spline_constraint();
-  // position, velocity, acceleration
-
+  // position, velocity, acceleration，位置、速度、加速度
+  ///必须过原点
   if (!constraint->AddPointConstraint(0.0, 0.0)) {
     const std::string msg = "add st start point constraint failed";
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
   ADEBUG << "init point constraint:" << init_point.DebugString();
+  ///原点处的斜率必须等于起始速度
   if (!constraint->AddPointDerivativeConstraint(0.0, init_point_.v())) {
     const std::string msg = "add st start point velocity constraint failed!";
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
-
+  ///st末端点的加速度限制为0
   if (!constraint->AddPointSecondDerivativeConstraint(
           spline_generator_->spline().x_knots().back(), 0.0)) {
     const std::string msg = "add st end point acceleration constraint failed!";
@@ -159,24 +167,24 @@ Status QpSplineStGraph::ApplyConstraint(
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
 
-  // monotone constraint
+  // monotone constraint 单调约束，不等式约束
   if (!constraint->AddMonotoneInequalityConstraintAtKnots()) {
     const std::string msg = "add monotone inequality constraint failed!";
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
 
-  // smoothness constraint
+  // smoothness constraint 平滑约束
   if (!constraint->AddSecondDerivativeSmoothConstraint()) {
     const std::string msg = "add smoothness joint constraint failed!";
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
 
-  // boundary constraint
+  // boundary constraint 边界约束
   std::vector<double> s_upper_bound;
   std::vector<double> s_lower_bound;
-
+  /// 遍历时间，当前每2s一个间隔，获取s的上下界
   for (const double curr_t : t_evaluated_) {
     double lower_s = 0.0;
     double upper_s = 0.0;
@@ -191,13 +199,14 @@ Status QpSplineStGraph::ApplyConstraint(
 
   DCHECK_EQ(t_evaluated_.size(), s_lower_bound.size());
   DCHECK_EQ(t_evaluated_.size(), s_upper_bound.size());
+  ///增加边界约束
   if (!constraint->AddBoundary(t_evaluated_, s_lower_bound, s_upper_bound)) {
     const std::string msg = "Fail to apply distance constraints.";
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
 
-  // speed constraint
+  // 速度约束
   std::vector<double> speed_upper_bound;
   if (!EstimateSpeedUpperBound(init_point, speed_limit, &speed_upper_bound)
            .ok()) {
@@ -233,7 +242,7 @@ Status QpSplineStGraph::ApplyConstraint(
            << "; speed_upper_bound: " << speed_upper_bound[i];
   }
 
-  // acceleration constraint
+  // acceleration constraint加速度约束
   std::vector<double> accel_lower_bound(t_evaluated_.size(), accel_bound.first);
   std::vector<double> accel_upper_bound(t_evaluated_.size(),
                                         accel_bound.second);
@@ -408,7 +417,7 @@ Status QpSplineStGraph::GetSConstraintByTime(
   for (const StBoundary& boundary : boundaries) {
     double s_upper = 0.0;
     double s_lower = 0.0;
-
+    ///获取s的上下界
     if (!boundary.GetUnblockSRange(time, &s_upper, &s_lower)) {
       continue;
     }

@@ -269,13 +269,17 @@ double StBoundary::characteristic_length() const {
 void StBoundary::SetCharacteristicLength(const double characteristic_length) {
   characteristic_length_ = characteristic_length;
 }
-
+/// @brief 获取s的上下限
+/// @param curr_time 
+/// @param s_upper 
+/// @param s_lower 
+/// @return 
 bool StBoundary::GetUnblockSRange(const double curr_time, double* s_upper,
                                   double* s_lower) const {
   CHECK_NOTNULL(s_upper);
   CHECK_NOTNULL(s_lower);
 
-  *s_upper = s_high_limit_;
+  *s_upper = s_high_limit_;///< s_high_limit_ = 200
   *s_lower = 0.0;
   if (curr_time < min_t_ || curr_time > max_t_) {
     return true;
@@ -283,6 +287,7 @@ bool StBoundary::GetUnblockSRange(const double curr_time, double* s_upper,
 
   size_t left = 0;
   size_t right = 0;
+  ///获取索引
   if (!GetIndexRange(lower_points_, curr_time, &left, &right)) {
     AERROR << "Fail to get index range.";
     return false;
@@ -292,16 +297,18 @@ bool StBoundary::GetUnblockSRange(const double curr_time, double* s_upper,
 
   double upper_cross_s =
       upper_points_[left].s() +
-      r * (upper_points_[right].s() - upper_points_[left].s());
+      r * (upper_points_[right].s() - upper_points_[left].s()); ///? 有疑问，不应该是curr_time - upper_points_[left].s()吗
   double lower_cross_s =
       lower_points_[left].s() +
-      r * (lower_points_[right].s() - lower_points_[left].s());
+      r * (lower_points_[right].s() - lower_points_[left].s());///? 同样疑问
 
   if (boundary_type_ == BoundaryType::STOP ||
       boundary_type_ == BoundaryType::YIELD ||
       boundary_type_ == BoundaryType::FOLLOW) {
+    ///s的上限就是下界
     *s_upper = std::fmin(*s_upper, lower_cross_s);
   } else if (boundary_type_ == BoundaryType::OVERTAKE) {
+    ///s的下限就是上界
     *s_lower = std::fmax(*s_lower, upper_cross_s);
   } else {
     AERROR << "boundary_type is not supported. boundary_type: "
