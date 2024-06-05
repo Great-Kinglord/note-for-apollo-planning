@@ -115,13 +115,14 @@ Status QpSplineStGraph::Search(const StGraphData& st_graph_data,
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
 
-  // extract output
+  ///提取输出
   speed_data->Clear();
   const Spline1d& spline = spline_generator_->spline();
 
   double t_output_resolution =
-      qp_spline_st_speed_config_.output_time_resolution();
+      qp_spline_st_speed_config_.output_time_resolution();///< 0.05s
   double time = 0.0;
+  ///总共8s
   while (time < qp_spline_st_speed_config_.total_time() + t_output_resolution) {
     double s = spline(time);
     double v = spline.Derivative(time);
