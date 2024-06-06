@@ -48,18 +48,19 @@ ActiveSetQpSolver::ActiveSetQpSolver(
       debug_info_(FLAGS_default_enable_active_set_debug_info) {}
 
 bool ActiveSetQpSolver::Solve() {
-  ::qpOASES::QProblem qp_problem(num_param_, num_constraint_);
+  /// 第一步创建QProblem对象
+  ::qpOASES::QProblem qp_problem(num_param_, num_constraint_); ///! 变量数num_param_，约束数num_constraint_
   ::qpOASES::Options my_options;
   my_options.epsNum = qp_eps_num_;
   my_options.epsDen = qp_eps_den_;
   my_options.epsIterRef = qp_eps_iter_ref_;
-  qp_problem.setOptions(my_options);
+  qp_problem.setOptions(my_options); ///< 设定需要设置的各参数
   if (!debug_info_) {
     qp_problem.setPrintLevel(qpOASES::PL_NONE);
   }
-  // definition of qpOASESproblem
-  double h_matrix[kernel_matrix_.rows() * kernel_matrix_.cols()];  // NOLINT
-  double g_matrix[offset_.rows()];                                 // NOLINT
+  // definition of qpOASESproblem 按行储存的矩阵
+  double h_matrix[kernel_matrix_.rows() * kernel_matrix_.cols()];  ///< hessian矩阵
+  double g_matrix[offset_.rows()];                                 ///< 梯度矩阵
   int index = 0;
 
   for (int r = 0; r < kernel_matrix_.rows(); ++r) {
@@ -108,13 +109,14 @@ bool ActiveSetQpSolver::Solve() {
     }
   }
 
-  // initialize problem
-  int max_iter = std::max(max_iteration_, num_constraint_);
-
+  ///初始化
+  int max_iter = std::max(max_iteration_, num_constraint_);///<最大迭代次数
+  ///第二步初始化QProblem对象的所有内部数据结构和序列中第一个QP的求解
+  ///affine_constraint_matrix:约束矩阵,接着就是自变量的上下边界，再接着就是约束的上下边界
   auto ret = qp_problem.init(h_matrix, g_matrix, affine_constraint_matrix,
                              lower_bound, upper_bound, constraint_lower_bound,
-                             constraint_upper_bound, max_iter);
-  if (ret != qpOASES::SUCCESSFUL_RETURN) {
+                             constraint_upper_bound, max_iter); ///< 初始化，返回状态，哪一项没有需要传入空指针
+  if (ret != qpOASES::SUCCESSFUL_RETURN) {///<初始化失败
     if (ret == qpOASES::RET_MAX_NWSR_REACHED) {
       AERROR << "qpOASES solver failed due to reached max iteration";
     } else {
@@ -126,7 +128,7 @@ bool ActiveSetQpSolver::Solve() {
 
   double result[num_param_];  // NOLINT
 
-  qp_problem.getPrimalSolution(result);
+  qp_problem.getPrimalSolution(result);///! 将最优原始解存储在result中
 
   params_ = Eigen::MatrixXd::Zero(num_param_, 1);
 

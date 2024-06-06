@@ -70,10 +70,14 @@ double Spline1d::ThirdOrderDerivative(const double x) const {
   std::uint32_t index = FindIndex(x);
   return splines_[index].ThirdOrderDerivative(x - x_knots_[index]);
 }
-
+/// @brief 规划结果，赋值给splines_
+/// @param params 规划期结果，就是一个一维向量
+/// @param order 5次多项式
+/// @return 
 bool Spline1d::SetSplineSegs(const Eigen::MatrixXd& params,
                              const std::uint32_t order) {
-  // check if the parameter size fit
+  ///比如 7*6 = 6 + 6*6 比如就是6段，就是6个五次多项式，但是点是7个
+  ///!五次多项式，order可能给的是6
   if (x_knots_.size() * order !=
       order + static_cast<std::uint32_t>(params.rows())) {
     return false;

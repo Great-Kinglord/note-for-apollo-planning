@@ -67,7 +67,9 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp",
-        "csignal": "cpp"
+        "csignal": "cpp",
+        "core": "cpp",
+        "splines": "cpp"
     },
     "workbench.colorCustomizations": {
         "statusBar.background": "#6c59ef",

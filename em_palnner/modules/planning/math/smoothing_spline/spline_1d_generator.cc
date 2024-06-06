@@ -27,7 +27,9 @@
 
 namespace apollo {
 namespace planning {
-
+/// @brief 
+/// @param x_knots 一个vector，存储了t的节点，也就是划分了几段，不是6段就是7段
+/// @param spline_order 就是多项式的阶数，一般是5
 Spline1dGenerator::Spline1dGenerator(const std::vector<double>& x_knots,
                                      const std::uint32_t spline_order)
     : spline_(x_knots, spline_order),
@@ -64,11 +66,12 @@ bool Spline1dGenerator::Solve() {
   const Eigen::MatrixXd& equality_constraint_boundary =
       spline_constraint_.equality_constraint().constraint_boundary();
 
+  ///这里就把所有的参数传进来了
   qp_solver_.reset(new apollo::common::math::ActiveSetQpSolver(
       kernel_matrix, offset, inequality_constraint_matrix,
       inequality_constraint_boundary, equality_constraint_matrix,
       equality_constraint_boundary));
-
+    ///进行了求解
   if (!qp_solver_->Solve()) {
     return false;
   }

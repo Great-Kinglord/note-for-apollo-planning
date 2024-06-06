@@ -80,7 +80,8 @@ class Spline1dGenerator {
   // solve
   bool Solve();
 
-  // output
+  /// @brief 返回一个对Spline1d类型的spline_成员变量的常量引用
+  /// @return spline_的引用
   const Spline1d& spline() const;
 
  private:

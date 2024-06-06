@@ -199,17 +199,17 @@ bool QpSplinePathGenerator::InitSpline(const double start_s,
     return false;
   }
   const double delta_s =
-      (end_s - start_s) / qp_spline_path_config_.number_of_knots();
+      (end_s - start_s) / qp_spline_path_config_.number_of_knots(); ///? proto中默认是5，但是在txt中设置6
   double curr_knot_s = start_s;
-
+  ///上面的number应该表示多少段
   for (uint32_t i = 0; i <= qp_spline_path_config_.number_of_knots();
        ++i, curr_knot_s = std::min(curr_knot_s + delta_s, end_s)) {
     knots_.push_back(curr_knot_s);
   }
 
-  // spawn a new spline generator
+  ///生成新的样条曲线生成器
   spline_generator_.reset(
-      new Spline1dGenerator(knots_, qp_spline_path_config_.spline_order()));
+      new Spline1dGenerator(knots_, qp_spline_path_config_.spline_order()));///? 好多proto中默认6，应该是5
 
   // set evaluated_s_
   std::uint32_t num_evaluated_s =
