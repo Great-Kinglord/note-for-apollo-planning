@@ -47,6 +47,7 @@ QpSplineStGraph::QpSplineStGraph(
           qp_spline_st_speed_config_.total_time() /
           qp_splsine_st_speed_config_.number_of_evaluated_graph_t()) {
   ///total_time:8s number_of_discrete_graph_t:10 number_of_evaluated_graph_t:10，我们在txt中看到是4
+  ///!txt中的信息就是正确的，就是覆盖了默认的参数值，4表示四段五次多项式连接，按时间就是0，2，4，6，8
   Init();
 }
 
@@ -56,15 +57,15 @@ void QpSplineStGraph::Init() {
   for (uint32_t i = 0;
        i <= qp_spline_st_speed_config_.number_of_discrete_graph_t(); ++i) {
     t_knots_.push_back(curr_t);
-    curr_t += t_knots_resolution_; ///< +0.8s，如果是4的话，就是2s
+    curr_t += t_knots_resolution_; ///< 如果是4的话，就是2s
   }
 
   // init evaluated t positions
   curr_t = 0;
   for (uint32_t i = 0;
        i <= qp_spline_st_speed_config_.number_of_evaluated_graph_t(); ++i) {
-    t_evaluated_.push_back(curr_t);
-    curr_t += t_evaluated_resolution_;///< +0.8s，如果是4的话，就是2s
+    t_evaluated_.push_back(curr_t); ///< 大小就是5个
+    curr_t += t_evaluated_resolution_;///< 如果是4的话，就是2s
   }
 }
 
@@ -83,7 +84,7 @@ Status QpSplineStGraph::Search(const StGraphData& st_graph_data,
 
   // reset spline generator，这里reset用法改变智能指针的指向，它会先销毁原来的对象（如果有的话），然后指向新的对象
   spline_generator_.reset(new Spline1dGenerator(
-      t_knots_, qp_spline_st_speed_config_.spline_order()));///? spline_order因该是五次多项式，但是默认6，应该是5
+      t_knots_, qp_spline_st_speed_config_.spline_order()));///? spline_order因该是五次多项式，但是默认6,是不是应该理解为6个未知数
 
   // start to search for best st points
   init_point_ = st_graph_data.init_point();

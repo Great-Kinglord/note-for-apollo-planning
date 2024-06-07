@@ -100,7 +100,7 @@ Status QpSplineStSpeedOptimizer::Process(const SLBoundary& adc_sl_boundary,
   }
 
   SpeedLimit speed_limits;
-  if (boundary_mapper.GetSpeedLimits(&speed_limits) != Status::OK()) {///< 不同s处对应的速度限制
+  if (boundary_mapper.GetSpeedLimits(&speed_limits) != Status::OK()) {///< 不同s处对应的速度限制,SL曲线这里是定了线型的
     return Status(ErrorCode::PLANNING_ERROR,
                   "GetSpeedLimits for dp st speed optimizer failed!");
   }

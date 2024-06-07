@@ -26,7 +26,8 @@
 
 namespace apollo {
 namespace planning {
-
+/// @brief 约束
+/// @param pss 
 Spline1dConstraint::Spline1dConstraint(const Spline1d& pss)
     : x_knots_(pss.x_knots()), spline_order_(pss.spline_order()) {
   inequality_constraint_.SetIsEquality(false);

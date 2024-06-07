@@ -25,7 +25,8 @@
 
 namespace apollo {
 namespace planning {
-
+/// @brief 给vector<double> params_赋值,6个0，应为五次多项式，6个未知数
+/// @param order 
 PolynomialXd::PolynomialXd(const std::uint32_t order) : params_(order, 0.0) {}
 
 PolynomialXd::PolynomialXd(const std::vector<double>& params)

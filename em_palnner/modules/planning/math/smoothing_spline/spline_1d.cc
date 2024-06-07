@@ -33,7 +33,7 @@ Spline1d::Spline1d(const std::vector<double>& x_knots,
     : x_knots_(x_knots), spline_order_(order) {
   if (x_knots.size() > 1) {
     for (std::uint32_t i = 1; i < x_knots_.size(); ++i) {
-      splines_.emplace_back(spline_order_);
+      splines_.emplace_back(spline_order_); ///<size为5，那就是4段五次多项式，spline_order_中每一都储存了一个五次多项式系数
     }
   }
 }

@@ -213,7 +213,7 @@ bool QpSplinePathGenerator::InitSpline(const double start_s,
 
   // set evaluated_s_
   std::uint32_t num_evaluated_s =
-      qp_spline_path_config_.number_of_fx_constraint_knots();
+      qp_spline_path_config_.number_of_fx_constraint_knots(); ///< 13
   if (num_evaluated_s <= 2) {
     AERROR << "Too few evaluated positions. Suggest: > 2, current number: "
            << num_evaluated_s;

@@ -28,8 +28,8 @@
 namespace apollo {
 namespace planning {
 /// @brief 
-/// @param x_knots 一个vector，存储了t的节点，也就是划分了几段，不是6段就是7段
-/// @param spline_order 就是多项式的阶数，一般是5
+/// @param x_knots 一个vector，存储了t的节点，也就是划分了几段，size是5
+/// @param spline_order 就是多项式的阶数，一般是5，这里给得是6
 Spline1dGenerator::Spline1dGenerator(const std::vector<double>& x_knots,
                                      const std::uint32_t spline_order)
     : spline_(x_knots, spline_order),

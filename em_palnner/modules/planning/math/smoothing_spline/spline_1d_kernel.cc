@@ -41,9 +41,9 @@ Spline1dKernel::Spline1dKernel(const std::vector<double>& x_knots,
                                const std::uint32_t spline_order)
     : x_knots_(x_knots), spline_order_(spline_order) {
   total_params_ =
-      (x_knots.size() > 1 ? (x_knots.size() - 1) * spline_order_ : 0);
-  kernel_matrix_ = Eigen::MatrixXd::Zero(total_params_, total_params_);
-  offset_ = Eigen::MatrixXd::Zero(total_params_, 1);
+      (x_knots.size() > 1 ? (x_knots.size() - 1) * spline_order_ : 0); ///< 4*6=24,包含的参数个数
+  kernel_matrix_ = Eigen::MatrixXd::Zero(total_params_, total_params_); ///<24*24
+  offset_ = Eigen::MatrixXd::Zero(total_params_, 1);///<24*1
 }
 
 void Spline1dKernel::AddRegularization(const double regularized_param) {
