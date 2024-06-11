@@ -32,6 +32,7 @@ namespace planning {
 /// @param spline_order 就是多项式的阶数，一般是5，这里给得是6
 Spline1dGenerator::Spline1dGenerator(const std::vector<double>& x_knots,
                                      const std::uint32_t spline_order)
+                                     ///! 第一个包括了四个五次多项式信息，第二个包括约束信息，第三个是二次规划的目标函数信息
     : spline_(x_knots, spline_order),
       spline_constraint_(x_knots, spline_order),
       spline_kernel_(x_knots, spline_order) {}

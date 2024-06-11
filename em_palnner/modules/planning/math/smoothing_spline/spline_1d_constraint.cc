@@ -33,7 +33,9 @@ Spline1dConstraint::Spline1dConstraint(const Spline1d& pss)
   inequality_constraint_.SetIsEquality(false);
   equality_constraint_.SetIsEquality(true);
 }
-
+/// @brief 
+/// @param x_knots size为5
+/// @param spline_order txt中为6，五次多项式六个变量
 Spline1dConstraint::Spline1dConstraint(const std::vector<double>& x_knots,
                                        const std::uint32_t spline_order)
     : x_knots_(x_knots), spline_order_(spline_order) {

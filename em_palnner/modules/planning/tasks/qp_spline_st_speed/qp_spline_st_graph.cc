@@ -84,17 +84,17 @@ Status QpSplineStGraph::Search(const StGraphData& st_graph_data,
 
   // reset spline generator，这里reset用法改变智能指针的指向，它会先销毁原来的对象（如果有的话），然后指向新的对象
   spline_generator_.reset(new Spline1dGenerator(
-      t_knots_, qp_spline_st_speed_config_.spline_order()));///? spline_order因该是五次多项式，但是默认6,是不是应该理解为6个未知数
+      t_knots_, qp_spline_st_speed_config_.spline_order()));///? spline_order因该是五次多项式，但是默认6,是不是应该理解为6个未知数，理解正确
 
   // start to search for best st points
-  init_point_ = st_graph_data.init_point();
+  init_point_ = st_graph_data.init_point();///< 起始点,包含了xyz，速度，加速度，时间，角度等等
   ///规划的路径长度小于80m的话，就是上限就是80m
   if (st_graph_data.path_data_length() <
       qp_spline_st_speed_config_.total_path_length()) {
     qp_spline_st_speed_config_.set_total_path_length(
         st_graph_data.path_data_length());
   }
-  ///约束
+  ///!约束
   if (!ApplyConstraint(st_graph_data.init_point(), st_graph_data.speed_limit(),
                        st_graph_data.st_boundaries(), accel_bound)
            .ok()) {
@@ -102,7 +102,7 @@ Status QpSplineStGraph::Search(const StGraphData& st_graph_data,
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
-
+  ///!目标函数，包含H和g
   if (!ApplyKernel(st_graph_data.st_boundaries(), st_graph_data.speed_limit())
            .ok()) {
     const std::string msg = "Apply kernel failed!";
@@ -285,27 +285,31 @@ Status QpSplineStGraph::ApplyConstraint(
 
   return Status::OK();
 }
-
+/// @brief 这应该是核心之一，目标函数
+/// @param boundaries 
+/// @param speed_limit 
+/// @return 
 Status QpSplineStGraph::ApplyKernel(const std::vector<StBoundary>& boundaries,
                                     const SpeedLimit& speed_limit) {
   Spline1dKernel* spline_kernel = spline_generator_->mutable_spline_kernel();
-
+  ///加速度权重，五次多项式二阶导是和t相关的，t不同对应不同的加速度，这里用到在这个时间段的二阶导平方的积分
   if (qp_spline_st_speed_config_.accel_kernel_weight() > 0) {
     spline_kernel->AddSecondOrderDerivativeMatrix(
-        qp_spline_st_speed_config_.accel_kernel_weight());
+        qp_spline_st_speed_config_.accel_kernel_weight());///< 权重是1000
   }
-
+  ///加加速度权重
   if (qp_spline_st_speed_config_.jerk_kernel_weight() > 0) {
     spline_kernel->AddThirdOrderDerivativeMatrix(
-        qp_spline_st_speed_config_.jerk_kernel_weight());
+        qp_spline_st_speed_config_.jerk_kernel_weight());///< 权重是500
   }
-
+  ///位置的cost矩阵，保证拟合的st路径和最终的st路径相似
   if (!AddCruiseReferenceLineKernel(speed_limit,
-                                    qp_spline_st_speed_config_.cruise_weight())
+                                    qp_spline_st_speed_config_.cruise_weight()) 
            .ok()) {
+    ///< cruise_weight值为0.3
     return Status(ErrorCode::PLANNING_ERROR, "QpSplineStGraph::ApplyKernel");
   }
-
+  ///跟车的cost矩阵
   if (!AddFollowReferenceLineKernel(boundaries,
                                     qp_spline_st_speed_config_.follow_weight())
            .ok()) {
@@ -319,7 +323,10 @@ Status QpSplineStGraph::Solve() {
              ? Status::OK()
              : Status(ErrorCode::PLANNING_ERROR, "QpSplineStGraph::solve");
 }
-
+/// @brief 
+/// @param speed_limit 
+/// @param weight —— 0.3
+/// @return 
 Status QpSplineStGraph::AddCruiseReferenceLineKernel(
     const SpeedLimit& speed_limit, const double weight) {
   auto* spline_kernel = spline_generator_->mutable_spline_kernel();
@@ -330,6 +337,7 @@ Status QpSplineStGraph::AddCruiseReferenceLineKernel(
   }
   double dist_ref = 0.0;
   cruise_.push_back(dist_ref);
+  ///循环从1到4，根据限速，到每个2s节点，取出对应的s
   for (uint32_t i = 1; i < t_evaluated_.size(); ++i) {
     dist_ref += (t_evaluated_[i] - t_evaluated_[i - 1]) *
                 speed_limit.GetSpeedLimitByS(dist_ref);

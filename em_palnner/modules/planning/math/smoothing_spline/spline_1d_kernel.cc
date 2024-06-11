@@ -36,14 +36,18 @@ Spline1dKernel::Spline1dKernel(const Spline1d& spline1d)
   kernel_matrix_ = Eigen::MatrixXd::Zero(total_params_, total_params_);
   offset_ = Eigen::MatrixXd::Zero(total_params_, 1);
 }
-
+/// @brief 二次型相关的kernel
+/// @param x_knots 
+/// @param spline_order 
+///!知道了决策变量的个数是24个，那hessian矩阵H应该是24*24的
+///! 二次规划 min 1/2 x^T H x + g^T x
 Spline1dKernel::Spline1dKernel(const std::vector<double>& x_knots,
                                const std::uint32_t spline_order)
     : x_knots_(x_knots), spline_order_(spline_order) {
   total_params_ =
       (x_knots.size() > 1 ? (x_knots.size() - 1) * spline_order_ : 0); ///< 4*6=24,包含的参数个数
-  kernel_matrix_ = Eigen::MatrixXd::Zero(total_params_, total_params_); ///<24*24
-  offset_ = Eigen::MatrixXd::Zero(total_params_, 1);///<24*1
+  kernel_matrix_ = Eigen::MatrixXd::Zero(total_params_, total_params_); ///<24*24，这就是Hessian矩阵
+  offset_ = Eigen::MatrixXd::Zero(total_params_, 1);///<24*1，这就是梯度向量就是所谓的g向量
 }
 
 void Spline1dKernel::AddRegularization(const double regularized_param) {
@@ -94,24 +98,27 @@ void Spline1dKernel::AddDerivativeKernelMatrix(const double weight) {
                          spline_order_) += cur_kernel;
   }
 }
-
+/// @brief 二阶导数的平方后*权重
+/// @param weight 权重是1000
+/// 需要知道如何填充24*34矩阵H的
 void Spline1dKernel::AddSecondOrderDerivativeMatrix(const double weight) {
+  ///循环从0到3
   for (std::uint32_t i = 0; i + 1 < x_knots_.size(); ++i) {
     Eigen::MatrixXd cur_kernel =
         SplineSegKernel::instance()->SecondOrderDerivativeKernel(
-            spline_order_, x_knots_[i + 1] - x_knots_[i]) *
-        weight;
+            spline_order_, x_knots_[i + 1] - x_knots_[i]) * weight;///<得到的6*6的矩阵*权重
+    ///对角上各个6*6的块进行填充，比如i=2时，就是从12行12列开始填充六行六列
     kernel_matrix_.block(i * spline_order_, i * spline_order_, spline_order_,
                          spline_order_) += cur_kernel;
   }
 }
-
+/// @brief 三阶导数的平方后*权重
+/// @param weight 权重500
 void Spline1dKernel::AddThirdOrderDerivativeMatrix(const double weight) {
   for (std::uint32_t i = 0; i + 1 < x_knots_.size(); ++i) {
     Eigen::MatrixXd cur_kernel =
         SplineSegKernel::instance()->ThirdOrderDerivativeKernel(
-            spline_order_, x_knots_[i + 1] - x_knots_[i]) *
-        weight;
+            spline_order_, x_knots_[i + 1] - x_knots_[i]) * weight;
     kernel_matrix_.block(i * spline_order_, i * spline_order_, spline_order_,
                          spline_order_) += cur_kernel;
   }

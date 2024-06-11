@@ -209,7 +209,7 @@ bool QpSplinePathGenerator::InitSpline(const double start_s,
 
   ///生成新的样条曲线生成器
   spline_generator_.reset(
-      new Spline1dGenerator(knots_, qp_spline_path_config_.spline_order()));///? 好多proto中默认6，应该是5
+      new Spline1dGenerator(knots_, qp_spline_path_config_.spline_order()));///? 好多proto中默认6，理解是五次多项式六个未知数
 
   // set evaluated_s_
   std::uint32_t num_evaluated_s =
