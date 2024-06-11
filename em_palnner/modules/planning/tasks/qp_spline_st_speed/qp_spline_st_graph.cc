@@ -341,12 +341,13 @@ Status QpSplineStGraph::AddCruiseReferenceLineKernel(
   for (uint32_t i = 1; i < t_evaluated_.size(); ++i) {
     dist_ref += (t_evaluated_[i] - t_evaluated_[i - 1]) *
                 speed_limit.GetSpeedLimitByS(dist_ref);
-    cruise_.push_back(dist_ref);
+    cruise_.push_back(dist_ref);///<对应时间0，2，4，6，8s处的s，当然0处的s是0
   }
   if (st_graph_debug_) {
+    ///STGraphDebug是proto中的结构体，mutable_kernel_cruise_ref是一个结构体，包含了t和s
     auto kernel_cruise_ref = st_graph_debug_->mutable_kernel_cruise_ref();
-    kernel_cruise_ref->mutable_t()->Add(t_evaluated_[0]);
-    kernel_cruise_ref->mutable_cruise_line_s()->Add(dist_ref);
+    kernel_cruise_ref->mutable_t()->Add(t_evaluated_[0]);///< 赋值t,0处的t是0
+    kernel_cruise_ref->mutable_cruise_line_s()->Add(dist_ref);///< 赋值s，0处的s
     for (uint32_t i = 1; i < t_evaluated_.size(); ++i) {
       kernel_cruise_ref->mutable_t()->Add(t_evaluated_[i]);
       kernel_cruise_ref->mutable_cruise_line_s()->Add(cruise_[i]);
