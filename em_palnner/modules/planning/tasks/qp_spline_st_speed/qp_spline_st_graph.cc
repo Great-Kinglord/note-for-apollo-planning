@@ -46,13 +46,14 @@ QpSplineStGraph::QpSplineStGraph(
       t_evaluated_resolution_(
           qp_spline_st_speed_config_.total_time() /
           qp_splsine_st_speed_config_.number_of_evaluated_graph_t()) {
-  ///total_time:8s number_of_discrete_graph_t:10 number_of_evaluated_graph_t:10，我们在txt中看到是4
+  ///total_time:8s number_of_discrete_graph_t:4 number_of_evaluated_graph_t:10，我们在txt中看到是50
   ///!txt中的信息就是正确的，就是覆盖了默认的参数值，4表示四段五次多项式连接，按时间就是0，2，4，6，8
+  ///! t_evaluated_resolution_ = 8/50 = 0.16s
   Init();
 }
 
 void QpSplineStGraph::Init() {
-  // init knots
+  // init knots，t_knots_的size为5
   double curr_t = 0.0;
   for (uint32_t i = 0;
        i <= qp_spline_st_speed_config_.number_of_discrete_graph_t(); ++i) {
@@ -60,12 +61,12 @@ void QpSplineStGraph::Init() {
     curr_t += t_knots_resolution_; ///< 如果是4的话，就是2s
   }
 
-  // init evaluated t positions
+  ///! number_of_evaluated_graph_t在txt中可不是4了，而是50
   curr_t = 0;
   for (uint32_t i = 0;
        i <= qp_spline_st_speed_config_.number_of_evaluated_graph_t(); ++i) {
-    t_evaluated_.push_back(curr_t); ///< 大小就是5个
-    curr_t += t_evaluated_resolution_;///< 如果是4的话，就是2s
+    t_evaluated_.push_back(curr_t); ///< 大小就是51了
+    curr_t += t_evaluated_resolution_;
   }
 }
 
@@ -309,10 +310,11 @@ Status QpSplineStGraph::ApplyKernel(const std::vector<StBoundary>& boundaries,
     ///< cruise_weight值为0.3
     return Status(ErrorCode::PLANNING_ERROR, "QpSplineStGraph::ApplyKernel");
   }
-  ///跟车的cost矩阵
+  ///跟车的cost矩阵，需求就是跟车的时候，距离一定要保持在一定范围内，不能被甩的太开
   if (!AddFollowReferenceLineKernel(boundaries,
                                     qp_spline_st_speed_config_.follow_weight())
            .ok()) {
+    ///< follow_weight值为2.0
     return Status(ErrorCode::PLANNING_ERROR, "QpSplineStGraph::ApplyKernel");
   }
   return Status::OK();
@@ -337,11 +339,11 @@ Status QpSplineStGraph::AddCruiseReferenceLineKernel(
   }
   double dist_ref = 0.0;
   cruise_.push_back(dist_ref);
-  ///循环从1到4，根据限速，到每个2s节点，取出对应的s
+  ///这里的t_evaluated_的size为51了
   for (uint32_t i = 1; i < t_evaluated_.size(); ++i) {
     dist_ref += (t_evaluated_[i] - t_evaluated_[i - 1]) *
                 speed_limit.GetSpeedLimitByS(dist_ref);
-    cruise_.push_back(dist_ref);///<对应时间0，2，4，6，8s处的s，当然0处的s是0
+    cruise_.push_back(dist_ref);///<当然0处的s是0，时间为0 ，0.16 ...8
   }
   if (st_graph_debug_) {
     ///STGraphDebug是proto中的结构体，mutable_kernel_cruise_ref是一个结构体，包含了t和s
@@ -353,29 +355,28 @@ Status QpSplineStGraph::AddCruiseReferenceLineKernel(
       kernel_cruise_ref->mutable_cruise_line_s()->Add(cruise_[i]);
     }
   }
-  DCHECK_EQ(t_evaluated_.size(), cruise_.size());
-
-  for (std::size_t i = 0; i < t_evaluated_.size(); ++i) {
-    ADEBUG << "Cruise Ref S: " << cruise_[i]
-           << " Relative time: " << t_evaluated_[i] << std::endl;
-  }
-
+ 
   if (t_evaluated_.size() > 0) {
     spline_kernel->AddReferenceLineKernelMatrix(
         t_evaluated_, cruise_,
         weight * qp_spline_st_speed_config_.total_time() / t_evaluated_.size());
-  }
-  spline_kernel->AddRegularization(0.01);
+  }///<其中weight为0.3 0.3*8/51
+  spline_kernel->AddRegularization(0.01);///todo 不太懂，后面继续
   return Status::OK();
 }
 
+/// @brief 跟车的cost
+/// @param boundaries st图
+/// @param weight —— 2.0
+/// @return 
 Status QpSplineStGraph::AddFollowReferenceLineKernel(
     const std::vector<StBoundary>& boundaries, const double weight) {
   auto* spline_kernel = spline_generator_->mutable_spline_kernel();
   std::vector<double> ref_s;
   std::vector<double> filtered_evaluate_t;
+  /// 遍历时间0 0.16 0.32 ...8，总共50次循环
   for (size_t i = 0; i < t_evaluated_.size(); ++i) {
-    const double curr_t = t_evaluated_[i];
+    const double curr_t = t_evaluated_[i];///<当前时间
     double s_min = std::numeric_limits<double>::infinity();
     bool success = false;
     for (const auto& boundary : boundaries) {
@@ -387,13 +388,16 @@ Status QpSplineStGraph::AddFollowReferenceLineKernel(
       }
       double s_upper = 0.0;
       double s_lower = 0.0;
-      if (boundary.GetUnblockSRange(curr_t, &s_upper, &s_lower)) {
+      if (boundary.GetUnblockSRange(curr_t, &s_upper, &s_lower)) {///!跟车的话s_supper就是block的下边缘
         success = true;
-        s_min = std::min(s_min,
-                         s_upper - boundary.characteristic_length() -
-                             qp_spline_st_speed_config_.follow_drag_distance());
+        ///characteristic_length：0.1m
+        s_min = std::min(s_min, s_upper - boundary.characteristic_length() -
+                    qp_spline_st_speed_config_.follow_drag_distance()); ///< follow_drag_distance：17m
+        
       }
     }
+    /// 按照限速的话大于s_min的s就要考虑了，如果限速都小于s_min的话，就不用考虑了
+    /// 也就是需要在考虑限速下，车辆跟随前车在17m的距离内
     if (success && s_min < cruise_[i]) {
       filtered_evaluate_t.push_back(curr_t);
       ref_s.push_back(s_min);
@@ -404,12 +408,11 @@ Status QpSplineStGraph::AddFollowReferenceLineKernel(
       }
     }
   }
-  DCHECK_EQ(filtered_evaluate_t.size(), ref_s.size());
-
+  ///filtered_evaluate_t：满足条件点的时间，ref_s：考虑跟车距离的s_ref
   if (!ref_s.empty()) {
     spline_kernel->AddReferenceLineKernelMatrix(
         filtered_evaluate_t, ref_s,
-        weight * qp_spline_st_speed_config_.total_time() / t_evaluated_.size());
+        weight * qp_spline_st_speed_config_.total_time() / t_evaluated_.size());///< 2.0*8/51
   }
 
   for (std::size_t i = 0; i < filtered_evaluate_t.size(); ++i) {

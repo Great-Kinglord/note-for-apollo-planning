@@ -50,9 +50,11 @@ Spline1dKernel::Spline1dKernel(const std::vector<double>& x_knots,
   offset_ = Eigen::MatrixXd::Zero(total_params_, 1);///<24*1，这就是梯度向量就是所谓的g向量
 }
 
+/// @brief 添加正则化项，gpt告诉用于防止模型过拟合
+/// @param regularized_param 0.01
 void Spline1dKernel::AddRegularization(const double regularized_param) {
   Eigen::MatrixXd id_matrix =
-      Eigen::MatrixXd::Identity(kernel_matrix_.rows(), kernel_matrix_.cols());
+      Eigen::MatrixXd::Identity(kernel_matrix_.rows(), kernel_matrix_.cols());///<单位矩阵 24*24
   kernel_matrix_ += id_matrix * regularized_param;
 }
 
@@ -123,50 +125,62 @@ void Spline1dKernel::AddThirdOrderDerivativeMatrix(const double weight) {
                          spline_order_) += cur_kernel;
   }
 }
-
+/// @brief 和ref的距离的cost
+/// @param x_coord 0 2 4 6 8 秒
+/// @param ref_x 对应的ref的s
+/// @param weight 0.3 * 8/5，理解就是考虑5个点，每个点和限速跑的s的cost
+/// @return 
 bool Spline1dKernel::AddReferenceLineKernelMatrix(
     const std::vector<double>& x_coord, const std::vector<double>& ref_x,
     const double weight) {
+  ///两个都应该是51维的
   if (ref_x.size() != x_coord.size()) {
     return false;
   }
-
+  ///todo 现在我认为，每段的五次多项式t都是从0到2的，所以才需要t到端点t的插值
   for (std::uint32_t i = 0; i < x_coord.size(); ++i) {
-    double cur_index = find_index(x_coord[i]);
-    double cur_rel_x = x_coord[i] - x_knots_[cur_index];
-    // update offset
-    double offset_coef = -2.0 * ref_x[i] * weight;
-    for (std::uint32_t j = 0; j < spline_order_; ++j) {
-      offset_(j + cur_index * spline_order_, 0) += offset_coef;
-      offset_coef *= cur_rel_x;
+    double cur_index = find_index(x_coord[i]);///!第一个大于x_coord[i]的元素的索引-1，找是在第几段的五次多项式范围
+    double cur_rel_x = x_coord[i] - x_knots_[cur_index];///< 和当前段的起点的t的差值
+    /// 更新offset
+    double offset_coef = -2.0 * ref_x[i] * weight;///! weight(f(t) - s_ref)^2分解出来就是-2*weight*f(t)*s_ref，s_ref的平方向没有删掉
+    for (std::uint32_t j = 0; j < spline_order_; ++j) {///< 循环 0 到 5
+    /// offset_是24*1的矩阵，每个元素都是0，这里是对应的位置加上了offset_coef
+      offset_(j + cur_index * spline_order_, 0) += offset_coef;///< b = [1, t, t^2, t^3, t^4, t^5]
+      offset_coef *= cur_rel_x; ///?但是这里看cur_rel_x是2啊
     }
-    // update kernel matrix
-    Eigen::MatrixXd ref_kernel(spline_order_, spline_order_);
-
+    /// 更新H矩阵，存在一个weight*f(t)^2，最对到t的10次方
+    Eigen::MatrixXd ref_kernel(spline_order_, spline_order_);///<6*6的矩阵
     double cur_x = 1.0;
     std::vector<double> power_x;
     for (std::uint32_t n = 0; n + 1 < 2 * spline_order_; ++n) {
       power_x.emplace_back(cur_x);
-      cur_x *= cur_rel_x;
+      cur_x *= cur_rel_x;///< 1 t t^2 ... t^10
     }
 
     for (std::uint32_t r = 0; r < spline_order_; ++r) {
       for (std::uint32_t c = 0; c < spline_order_; ++c) {
+        //* | 1   t   t^2 t^3 t^4 t^5  |
+        //* | t   t^2 t^3 t^4 t^5 t^6  |
+        //* | t^2 t^3 t^4 t^5 t^6 t^7  |
+        //* | t^3 t^4 t^5 t^6 t^7 t^8  |
+        //* | t^4 t^5 t^6 t^7 t^8 t^9  |
+        //* | t^5 t^6 t^7 t^8 t^9 t^10 |
         ref_kernel(r, c) = power_x[r + c];
       }
     }
-
+    ///更新H矩阵，对角线块
     kernel_matrix_.block(cur_index * spline_order_, cur_index * spline_order_,
                          spline_order_, spline_order_) += weight * ref_kernel;
   }
   return true;
 }
-
+/// @brief 获取第一个大于x的元素索引-1，就是最后一个小于等于x的元素的索引
+/// @param x 
+/// @return 
 std::uint32_t Spline1dKernel::find_index(const double x) const {
-  auto upper_bound = std::upper_bound(x_knots_.begin() + 1, x_knots_.end(), x);
+  auto upper_bound = std::upper_bound(x_knots_.begin() + 1, x_knots_.end(), x);///<找到第一个大于x的元素
   return std::min(static_cast<std::uint32_t>(x_knots_.size() - 1),
-                  static_cast<std::uint32_t>(upper_bound - x_knots_.begin())) -
-         1;
+                  static_cast<std::uint32_t>(upper_bound - x_knots_.begin())) - 1;///<返回的是x所在的区间
 }
 
 void Spline1dKernel::add_distance_offset(const double weight) {
