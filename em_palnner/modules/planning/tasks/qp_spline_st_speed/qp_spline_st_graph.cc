@@ -136,7 +136,7 @@ Status QpSplineStGraph::Search(const StGraphData& st_graph_data,
 
   return Status::OK();
 }
-/// @brief 添加约束
+/// @brief 添加约束,包含等式和不等式约束 lb <= Ax <= ub以及lba <= x <= uba,向量都是24*1矩阵
 /// @param init_point 
 /// @param speed_limit 
 /// @param boundaries 
@@ -148,7 +148,7 @@ Status QpSplineStGraph::ApplyConstraint(
     const std::pair<double, double>& accel_bound) {
   Spline1dConstraint* constraint =
       spline_generator_->mutable_spline_constraint();
-  // position, velocity, acceleration，位置、速度、加速度
+  /// position, velocity, acceleration，位置、速度、加速度
   ///必须过原点
   if (!constraint->AddPointConstraint(0.0, 0.0)) {
     const std::string msg = "add st start point constraint failed";

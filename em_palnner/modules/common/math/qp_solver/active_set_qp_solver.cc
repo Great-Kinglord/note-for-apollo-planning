@@ -48,7 +48,7 @@ ActiveSetQpSolver::ActiveSetQpSolver(
       debug_info_(FLAGS_default_enable_active_set_debug_info) {}
 
 bool ActiveSetQpSolver::Solve() {
-  /// 第一步创建QProblem对象
+  /// 第一步创建QProblem对象 变量的数24个，约束数等式约束和不等式约束的和
   ::qpOASES::QProblem qp_problem(num_param_, num_constraint_); ///! 变量数num_param_，约束数num_constraint_
   ::qpOASES::Options my_options;
   my_options.epsNum = qp_eps_num_;

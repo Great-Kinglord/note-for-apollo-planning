@@ -267,41 +267,47 @@ bool Spline1dConstraint::AddThirdDerivativeBoundary(
   return inequality_constraint_.AddConstraint(inequality_constraint,
                                               inequality_boundary);
 }
-/// @brief 增加点约束
-/// @param x 
-/// @param fx 
+/// @brief 增加点约束，比如要过(0 0)点 
+/// @param x  0
+/// @param fx 0
 /// @return 
 bool Spline1dConstraint::AddPointConstraint(const double x, const double fx) {
-  std::uint32_t index = FindIndex(x);
+  std::uint32_t index = FindIndex(x);///<针对(0 0)点，index是0
   std::vector<double> power_x;
   GeneratePowerX(x - x_knots_[index], spline_order_, &power_x);///< 五次多项式的话，power_x是一个5维的向量，所有幂，就是插值的一次幂，到五次幂
   Eigen::MatrixXd equality_constraint =
       Eigen::MatrixXd::Zero(1, (x_knots_.size() - 1) * spline_order_);///<1 * (9*5)
   std::uint32_t index_offset = index * spline_order_;
-  for (std::uint32_t i = 0; i < spline_order_; ++i) {
-    equality_constraint(0, index_offset + i) = power_x[i];
+  for (std::uint32_t i = 0; i < spline_order_; ++i) {///<循环从0开始
+    equality_constraint(0, index_offset + i) = power_x[i];///< 这是一行24列矩阵
   }
   Eigen::MatrixXd equality_boundary(1, 1);///<1 * 1矩阵
   equality_boundary(0, 0) = fx;
   return AddEqualityConstraint(equality_constraint, equality_boundary);
 }
-
+/// @brief 增加一阶导数约束，也就是一阶导要过某个点
+/// @param x 
+/// @param dfx 
+/// @return 
 bool Spline1dConstraint::AddPointDerivativeConstraint(const double x,
                                                       const double dfx) {
   std::uint32_t index = FindIndex(x);
   std::vector<double> power_x;
   GeneratePowerX(x - x_knots_[index], spline_order_, &power_x);
   Eigen::MatrixXd equality_constraint =
-      Eigen::MatrixXd::Zero(1, (x_knots_.size() - 1) * spline_order_);
+      Eigen::MatrixXd::Zero(1, (x_knots_.size() - 1) * spline_order_);///<1 * 24
   std::uint32_t index_offset = index * spline_order_;
-  for (std::uint32_t i = 1; i < spline_order_; ++i) {
+  for (std::uint32_t i = 1; i < spline_order_; ++i) {///<从1开始
     equality_constraint(0, index_offset + i) = power_x[i - 1] * i;
   }
   Eigen::MatrixXd equality_boundary(1, 1);
   equality_boundary(0, 0) = dfx;
   return AddEqualityConstraint(equality_constraint, equality_boundary);
 }
-
+/// @brief 增加二阶导数约束，也就是二阶导要过某个点
+/// @param x 
+/// @param ddfx 
+/// @return 这里时间末端，加速度为0
 bool Spline1dConstraint::AddPointSecondDerivativeConstraint(const double x,
                                                             const double ddfx) {
   std::uint32_t index = FindIndex(x);
@@ -310,7 +316,7 @@ bool Spline1dConstraint::AddPointSecondDerivativeConstraint(const double x,
   Eigen::MatrixXd equality_constraint =
       Eigen::MatrixXd::Zero(1, (x_knots_.size() - 1) * spline_order_);
   std::uint32_t index_offset = index * spline_order_;
-  for (std::uint32_t i = 2; i < spline_order_; ++i) {
+  for (std::uint32_t i = 2; i < spline_order_; ++i) {///< 从2开始
     equality_constraint(0, index_offset + i) = power_x[i - 2] * i * (i - 1);
   }
   Eigen::MatrixXd equality_boundary(1, 1);
@@ -395,17 +401,25 @@ bool Spline1dConstraint::AddDerivativeSmoothConstraint() {
   return equality_constraint_.AddConstraint(equality_constraint,
                                             equality_boundary);
 }
-
+/// @brief 平滑约束
+/// @return 
+/*
+ * - 前一个函数终点和后一个函数起点函数值相同，即连续对应相对时间t时刻，两段上无人车的位置必须是相同的  条件1
+ * - 前一个函数终点和后一个函数一阶导相同，对应相对时间t时刻，两段上无人车的速度必须是相同的           条件2
+ * - 前一个函数终点和后一个函数二阶导相同，对应相对时间t时刻，两段上无人车的加速度必须是相同的         条件3
+ * - 前一个函数终点和后一个函数三阶导相同，对应相对时间t时刻，两段上无人车的加速度抖动必须是相同的      条件4
+*/
+///!这里看起来没用到条件4
 bool Spline1dConstraint::AddSecondDerivativeSmoothConstraint() {
   if (x_knots_.size() < 3) {
     return false;
   }
 
-  const std::uint32_t n_constraint = (x_knots_.size() - 2) * 3;
+  const std::uint32_t n_constraint = (x_knots_.size() - 2) * 3;///< 3*3=9
   Eigen::MatrixXd equality_constraint = Eigen::MatrixXd::Zero(
-      n_constraint, (x_knots_.size() - 1) * spline_order_);
-  Eigen::MatrixXd equality_boundary = Eigen::MatrixXd::Zero(n_constraint, 1);
-
+      n_constraint, (x_knots_.size() - 1) * spline_order_);///< 9*24矩阵
+  Eigen::MatrixXd equality_boundary = Eigen::MatrixXd::Zero(n_constraint, 1);///<9*1向量
+  ///0 3 6
   for (std::uint32_t i = 0; i < n_constraint; i += 3) {
     double left_coef = 1.0;
     double right_coef = -1.0;
@@ -416,10 +430,12 @@ bool Spline1dConstraint::AddSecondDerivativeSmoothConstraint() {
 
     const double x_left = x_knots_[i / 3 + 1] - x_knots_[i / 3];
     const double x_right = 0.0;
+    ///循环0到5
     for (std::uint32_t j = 0; j < spline_order_; ++j) {
+      ///这应该对应条件1
       equality_constraint(i, spline_order_ * (i / 3) + j) = left_coef;
       equality_constraint(i, spline_order_ * (i / 3 + 1) + j) = right_coef;
-
+      ///这应该对应条件3
       if (j >= 2) {
         equality_constraint(i + 2, spline_order_ * i / 3 + j) =
             left_ddcoef * j * (j - 1);
@@ -428,7 +444,7 @@ bool Spline1dConstraint::AddSecondDerivativeSmoothConstraint() {
         left_ddcoef = left_dcoef;
         right_ddcoef = right_dcoef;
       }
-
+      ///这应该对应条件2
       if (j >= 1) {
         equality_constraint(i + 1, spline_order_ * (i / 3) + j) =
             left_dcoef * j;
@@ -441,8 +457,7 @@ bool Spline1dConstraint::AddSecondDerivativeSmoothConstraint() {
       right_coef *= x_right;
     }
   }
-  return equality_constraint_.AddConstraint(equality_constraint,
-                                            equality_boundary);
+  return equality_constraint_.AddConstraint(equality_constraint,equality_boundary);
 }
 
 bool Spline1dConstraint::AddThirdDerivativeSmoothConstraint() {
@@ -504,36 +519,39 @@ bool Spline1dConstraint::AddThirdDerivativeSmoothConstraint() {
   return equality_constraint_.AddConstraint(equality_constraint,
                                             equality_boundary);
 }
-
+/// @brief 单调不等式约束
+/// @param x_coord 
+/// @return 
 bool Spline1dConstraint::AddMonotoneInequalityConstraint(
     const std::vector<double>& x_coord) {
   if (x_coord.size() < 2) {
     // no inequality constraint needed
     return false;
   }
-
+ ///?我觉得x_coord.size()是51
   Eigen::MatrixXd inequality_constraint = Eigen::MatrixXd::Zero(
-      x_coord.size() - 1, (x_knots_.size() - 1) * spline_order_);
+      x_coord.size() - 1, (x_knots_.size() - 1) * spline_order_);///< 50 * 24
   Eigen::MatrixXd inequality_boundary =
-      Eigen::MatrixXd::Zero(x_coord.size() - 1, 1);
+      Eigen::MatrixXd::Zero(x_coord.size() - 1, 1);///< 50 * 1
 
   std::uint32_t prev_spline_index = FindIndex(x_coord[0]);
   double prev_rel_x = x_coord[0] - x_knots_[prev_spline_index];
   std::vector<double> prev_coef;
   GeneratePowerX(prev_rel_x, spline_order_, &prev_coef);
+  ///这里是一个循环，从1开始
   for (std::uint32_t i = 1; i < x_coord.size(); ++i) {
     std::uint32_t cur_spline_index = FindIndex(x_coord[i]);
     double cur_rel_x = x_coord[i] - x_knots_[cur_spline_index];
     std::vector<double> cur_coef;
     GeneratePowerX(cur_rel_x, spline_order_, &cur_coef);
-    // if constraint on the same spline
+    // if constraint on the same spline,在同一段的五次多项式
     if (cur_spline_index == prev_spline_index) {
       for (std::uint32_t j = 0; j < cur_coef.size(); ++j) {
         inequality_constraint(i - 1, cur_spline_index * spline_order_ + j) =
             cur_coef[j] - prev_coef[j];
       }
     } else {
-      // if not on the same spline
+      // if not on the same spline 不在同一段的五次多项式
       for (std::uint32_t j = 0; j < cur_coef.size(); ++j) {
         inequality_constraint(i - 1, prev_spline_index * spline_order_ + j) =
             -prev_coef[j];
@@ -544,8 +562,7 @@ bool Spline1dConstraint::AddMonotoneInequalityConstraint(
     prev_coef = cur_coef;
   }
 
-  return inequality_constraint_.AddConstraint(inequality_constraint,
-                                              inequality_boundary);
+  return inequality_constraint_.AddConstraint(inequality_constraint,inequality_boundary);
 }
 
 bool Spline1dConstraint::AddMonotoneInequalityConstraintAtKnots() {

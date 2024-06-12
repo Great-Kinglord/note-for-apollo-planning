@@ -48,10 +48,14 @@ const Eigen::MatrixXd& AffineConstraint::constraint_matrix() const {
 const Eigen::MatrixXd& AffineConstraint::constraint_boundary() const {
   return constraint_boundary_;
 }
-
+/// @brief 
+/// @param constraint_matrix 
+/// @param constraint_boundary 
+/// @return 
 bool AffineConstraint::AddConstraint(
     const Eigen::MatrixXd& constraint_matrix,
     const Eigen::MatrixXd& constraint_boundary) {
+///todo 暂时不理解，后面再看
   if (constraint_matrix.rows() != constraint_boundary.rows()) {
     return false;
   }
@@ -70,7 +74,7 @@ bool AffineConstraint::AddConstraint(
                            constraint_matrix_.cols());
   Eigen::MatrixXd n_boundary(
       constraint_boundary_.rows() + constraint_boundary.rows(), 1);
-
+  ///使用<<操作符，将constraint_matrix_和constraint_matrix插入到n_matrix
   n_matrix << constraint_matrix_, constraint_matrix;
   n_boundary << constraint_boundary_, constraint_boundary;
   constraint_matrix_ = n_matrix;
