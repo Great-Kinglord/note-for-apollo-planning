@@ -297,10 +297,10 @@ bool StBoundary::GetUnblockSRange(const double curr_time, double* s_upper,
 
   double upper_cross_s =
       upper_points_[left].s() +
-      r * (upper_points_[right].s() - upper_points_[left].s()); ///? 有疑问，不应该是curr_time - upper_points_[left].s()吗
+      r * (upper_points_[right].s() - upper_points_[left].s()); ///没问题
   double lower_cross_s =
       lower_points_[left].s() +
-      r * (lower_points_[right].s() - lower_points_[left].s());///? 同样疑问
+      r * (lower_points_[right].s() - lower_points_[left].s());
 
   if (boundary_type_ == BoundaryType::STOP ||
       boundary_type_ == BoundaryType::YIELD ||
@@ -308,7 +308,7 @@ bool StBoundary::GetUnblockSRange(const double curr_time, double* s_upper,
     ///s的上限就是下界
     *s_upper = std::fmin(*s_upper, lower_cross_s);
   } else if (boundary_type_ == BoundaryType::OVERTAKE) {
-    ///s的下限就是上界
+    ///s的下限就是上界，因为是超车
     *s_lower = std::fmax(*s_lower, upper_cross_s);
   } else {
     AERROR << "boundary_type is not supported. boundary_type: "

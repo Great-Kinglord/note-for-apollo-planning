@@ -77,7 +77,7 @@ double Spline1d::ThirdOrderDerivative(const double x) const {
 bool Spline1d::SetSplineSegs(const Eigen::MatrixXd& params,
                              const std::uint32_t order) {
   ///比如 7*6 = 6 + 6*6 比如就是6段，就是6个五次多项式，但是点是7个
-  ///!五次多项式，order可能给的是6
+  ///!五次多项式，order给的是6，表示6个未知数
   if (x_knots_.size() * order !=
       order + static_cast<std::uint32_t>(params.rows())) {
     return false;

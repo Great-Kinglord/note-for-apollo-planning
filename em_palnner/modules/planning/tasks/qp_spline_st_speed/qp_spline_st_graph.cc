@@ -110,30 +110,28 @@ Status QpSplineStGraph::Search(const StGraphData& st_graph_data,
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
-
+  ///!求解，输出四段五次多项式的系数
   if (!Solve().ok()) {
     const std::string msg = "Solve qp problem failed!";
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
 
-  ///提取输出
+  ///!提取输出
   speed_data->Clear();
   const Spline1d& spline = spline_generator_->spline();
-
   double t_output_resolution =
       qp_spline_st_speed_config_.output_time_resolution();///< 0.05s
   double time = 0.0;
-  ///总共8s
+  ///总共8s，轨迹包含了s,v,a,da
   while (time < qp_spline_st_speed_config_.total_time() + t_output_resolution) {
-    double s = spline(time);
+    double s = spline(time);///< 会自己计算t在那一条曲线上
     double v = spline.Derivative(time);
     double a = spline.SecondOrderDerivative(time);
     double da = spline.ThirdOrderDerivative(time);
     speed_data->AppendSpeedPoint(s, time, v, a, da);
     time += t_output_resolution;
   }
-
   return Status::OK();
 }
 /// @brief 添加约束,包含等式和不等式约束 lb <= Ax <= ub以及lba <= x <= uba,向量都是24*1矩阵
@@ -187,7 +185,7 @@ Status QpSplineStGraph::ApplyConstraint(
   // boundary constraint 边界约束
   std::vector<double> s_upper_bound;
   std::vector<double> s_lower_bound;
-  /// 遍历时间，当前每2s一个间隔，获取s的上下界
+  /// 遍历时间，当前每2s一个间隔，获取s的上下界,这个t_evaluated_size就是51
   for (const double curr_t : t_evaluated_) {
     double lower_s = 0.0;
     double upper_s = 0.0;
@@ -202,6 +200,7 @@ Status QpSplineStGraph::ApplyConstraint(
 
   DCHECK_EQ(t_evaluated_.size(), s_lower_bound.size());
   DCHECK_EQ(t_evaluated_.size(), s_upper_bound.size());
+
   ///增加边界约束
   if (!constraint->AddBoundary(t_evaluated_, s_lower_bound, s_upper_bound)) {
     const std::string msg = "Fail to apply distance constraints.";
@@ -209,7 +208,7 @@ Status QpSplineStGraph::ApplyConstraint(
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
 
-  // 速度约束
+  /// 添加速度约束
   std::vector<double> speed_upper_bound;
   if (!EstimateSpeedUpperBound(init_point, speed_limit, &speed_upper_bound)
            .ok()) {
@@ -218,7 +217,7 @@ Status QpSplineStGraph::ApplyConstraint(
     return Status(ErrorCode::PLANNING_ERROR, msg);
   }
 
-  std::vector<double> speed_lower_bound(t_evaluated_.size(), 0.0);
+  std::vector<double> speed_lower_bound(t_evaluated_.size(), 0.0);///< 车速下限为0
 
   DCHECK_EQ(t_evaluated_.size(), speed_upper_bound.size());
   DCHECK_EQ(t_evaluated_.size(), speed_lower_bound.size());
@@ -245,25 +244,24 @@ Status QpSplineStGraph::ApplyConstraint(
            << "; speed_upper_bound: " << speed_upper_bound[i];
   }
 
-  // acceleration constraint加速度约束
-  std::vector<double> accel_lower_bound(t_evaluated_.size(), accel_bound.first);
-  std::vector<double> accel_upper_bound(t_evaluated_.size(),
-                                        accel_bound.second);
+  /// acceleration constraint加速度约束
+  std::vector<double> accel_lower_bound(t_evaluated_.size(), accel_bound.first);///<速度上下限直接给了一个标定量
+  std::vector<double> accel_upper_bound(t_evaluated_.size(), accel_bound.second);///<速度上下限直接给了一个标定量
 
   bool has_follow = false;
   double delta_s = 1.0;
   for (const auto& boundary : boundaries) {
     if (boundary.boundary_type() == StBoundary::BoundaryType::FOLLOW) {
       has_follow = true;
-      delta_s = std::fmin(
-          delta_s, boundary.min_s() - fabs(boundary.characteristic_length()));
+      delta_s = std::fmin( delta_s, boundary.min_s() - fabs(boundary.characteristic_length()));///< 找到最小的距离
     }
   }
+  ///FLAGS_enable_follow_accel_constraint为true
   if (FLAGS_enable_follow_accel_constraint && has_follow && delta_s < 0.0) {
-    accel_upper_bound.front() = 0.0;
+    ///跟车的如果距离小于跟车距离并小于1m
+    accel_upper_bound.front() = 0.0;///< 第一个元素,表示不加速
   } else {
     constexpr double kInitPointAccelRelaxedSpeed = 1.0;
-
     if (init_point_.v() > kInitPointAccelRelaxedSpeed) {
       constexpr double kInitPointAccelRelaxedRange = 0.25;
       accel_lower_bound.front() = init_point_.a() - kInitPointAccelRelaxedRange;
@@ -421,12 +419,18 @@ Status QpSplineStGraph::AddFollowReferenceLineKernel(
   }
   return Status::OK();
 }
-
+/// @brief 根据时间获取s的上下界
+/// @param boundaries 
+/// @param time 
+/// @param total_path_s 
+/// @param s_upper_bound 
+/// @param s_lower_bound 
+/// @return 
 Status QpSplineStGraph::GetSConstraintByTime(
     const std::vector<StBoundary>& boundaries, const double time,
     const double total_path_s, double* const s_upper_bound,
     double* const s_lower_bound) const {
-  *s_upper_bound = total_path_s;
+   *s_upper_bound = total_path_s;
 
   for (const StBoundary& boundary : boundaries) {
     double s_upper = 0.0;
@@ -442,13 +446,17 @@ Status QpSplineStGraph::GetSConstraintByTime(
       *s_upper_bound = std::fmin(*s_upper_bound, s_upper);
     } else {
       DCHECK(boundary.boundary_type() == StBoundary::BoundaryType::OVERTAKE);
-      *s_lower_bound = std::fmax(*s_lower_bound, s_lower);
+      *s_lower_bound = std::fmax(*s_lower_bound, s_lower);///< s_lower_bound初始为0
     }
   }
 
   return Status::OK();
 }
-
+/// @brief 限速约束
+/// @param init_point 
+/// @param speed_limit 
+/// @param speed_upper_bound 
+/// @return 也就是一阶导约束
 Status QpSplineStGraph::EstimateSpeedUpperBound(
     const common::TrajectoryPoint& init_point, const SpeedLimit& speed_limit,
     std::vector<double>* speed_upper_bound) const {
@@ -456,15 +464,16 @@ Status QpSplineStGraph::EstimateSpeedUpperBound(
 
   speed_upper_bound->clear();
 
-  // use v to estimate position: not accurate, but feasible in cyclic
-  // processing. We can do the following process multiple times and use
-  // previous cycle's results for better estimation.
+/*
+ * 使用v来估计位置：不准确，但在循环中可行处理。我们可以多次执行以下过程并使用
+ * 上一个周期的结果，以便更好地估计。
+*/
   const double v = init_point.v();
 
   if (static_cast<double>(t_evaluated_.size() +
                           speed_limit.speed_limit_points().size()) <
       t_evaluated_.size() * std::log(static_cast<double>(
-                                speed_limit.speed_limit_points().size()))) {
+                                speed_limit.speed_limit_points().size()))) {///< log表示自然对数
     uint32_t i = 0;
     uint32_t j = 0;
     const double kDistanceEpsilon = 1e-6;
@@ -473,15 +482,14 @@ Status QpSplineStGraph::EstimateSpeedUpperBound(
       const double distance = v * t_evaluated_[i];
       if (fabs(distance - speed_limit.speed_limit_points()[j].first) <
           kDistanceEpsilon) {
+        ///< s距离很近
         speed_upper_bound->push_back(
-            speed_limit.speed_limit_points()[j].second);
+            speed_limit.speed_limit_points()[j].second);///< 速度限制
         ++i;
-        ADEBUG << "speed upper bound:" << speed_upper_bound->back();
       } else if (distance < speed_limit.speed_limit_points()[j].first) {
         ++i;
       } else if (distance <= speed_limit.speed_limit_points()[j + 1].first) {
         speed_upper_bound->push_back(speed_limit.GetSpeedLimitByS(distance));
-        ADEBUG << "speed upper bound:" << speed_upper_bound->back();
         ++i;
       } else {
         ++j;
@@ -490,7 +498,6 @@ Status QpSplineStGraph::EstimateSpeedUpperBound(
 
     for (uint32_t k = speed_upper_bound->size(); k < t_evaluated_.size(); ++k) {
       speed_upper_bound->push_back(qp_spline_st_speed_config_.max_speed());
-      ADEBUG << "speed upper bound:" << speed_upper_bound->back();
     }
   } else {
     auto cmp = [](const std::pair<double, double>& p1, const double s) {
@@ -501,16 +508,15 @@ Status QpSplineStGraph::EstimateSpeedUpperBound(
     for (const double t : t_evaluated_) {
       const double s = v * t;
 
-      // NOTICE: we are using binary search here based on two assumptions:
-      // (1) The s in speed_limit_points increase monotonically.
-      // (2) The evaluated_t_.size() << number of speed_limit_points.size()
-      //
-      // If either of the two assumption is failed, a new algorithm must be
-      // used
-      // to replace the binary search.
-
+      /*
+      * 注意：我们在这里使用二进制搜索是基于两个假设：
+      *（1） speed_limit_points中的s单调增加。
+      *（2） 评估的_t_.size（）<<number of speed_limit_points.size（）
+      * 如果这两个假设中的任何一个都失败了，则必须使用新的算法用于替换二进制搜索。
+      */
+     ///这里必须使用cmp，因为其中一个是std::pair<double, double> 的向量，而 s 是一个 double，所以不能直接比较。
       const auto& it = std::lower_bound(speed_limit_points.begin(),
-                                        speed_limit_points.end(), s, cmp);
+                                        speed_limit_points.end(), s, cmp);///< 查找第一个大于等于s的元素
       if (it != speed_limit_points.end()) {
         speed_upper_bound->push_back(it->second);
       } else {
@@ -518,11 +524,10 @@ Status QpSplineStGraph::EstimateSpeedUpperBound(
       }
     }
   }
-
   const double kTimeBuffer = 2.0;
   const double kSpeedBuffer = 0.1;
-  for (uint32_t k = 0; k < t_evaluated_.size() && t_evaluated_[k] < kTimeBuffer;
-       ++k) {
+  ///要求2s内
+  for (uint32_t k = 0; k < t_evaluated_.size() && t_evaluated_[k] < kTimeBuffer; ++k) {
     speed_upper_bound->at(k) =
         std::fmax(init_point_.v() + kSpeedBuffer, speed_upper_bound->at(k));
   }

@@ -78,7 +78,7 @@ bool Spline1dGenerator::Solve() {
   }
 
   const std::uint32_t spline_order = spline_.spline_order();
-  const Eigen::MatrixXd solved_params = qp_solver_->params();
+  const Eigen::MatrixXd solved_params = qp_solver_->params();///<这个就是求解出来的参数,24*1的向量
   return spline_.SetSplineSegs(solved_params, spline_order);
 }
 

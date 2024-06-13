@@ -56,7 +56,11 @@ bool Spline1dConstraint::AddEqualityConstraint(
   return equality_constraint_.AddConstraint(constraint_matrix,
                                             constraint_boundary);
 }
-
+/// @brief 增加边界约束
+/// @param x_coord 
+/// @param lower_bound 
+/// @param upper_bound 
+/// @return 
 bool Spline1dConstraint::AddBoundary(const std::vector<double>& x_coord,
                                      const std::vector<double>& lower_bound,
                                      const std::vector<double>& upper_bound) {
@@ -68,7 +72,7 @@ bool Spline1dConstraint::AddBoundary(const std::vector<double>& x_coord,
   if (x_knots_.size() < 2) {
     return false;
   }
-
+  ///?为什么要过滤？，现在看是判断是否存在nan和无穷大值
   if (!FilterConstraints(x_coord, lower_bound, upper_bound,
                          &filtered_lower_bound_x, &filtered_lower_bound,
                          &filtered_upper_bound_x, &filtered_upper_bound)) {
@@ -77,12 +81,12 @@ bool Spline1dConstraint::AddBoundary(const std::vector<double>& x_coord,
   // emplace affine constraints
   Eigen::MatrixXd inequality_constraint = Eigen::MatrixXd::Zero(
       filtered_upper_bound.size() + filtered_lower_bound.size(),
-      (x_knots_.size() - 1) * spline_order_);
+      (x_knots_.size() - 1) * spline_order_);///< $*24
   Eigen::MatrixXd inequality_boundary = Eigen::MatrixXd::Zero(
       filtered_upper_bound.size() + filtered_lower_bound.size(), 1);
 
   for (std::uint32_t i = 0; i < filtered_lower_bound.size(); ++i) {
-    std::uint32_t index = FindIndex(filtered_lower_bound_x[i]);
+    std::uint32_t index = FindIndex(filtered_lower_bound_x[i]);///<在哪一段五次多项式上
 
     const double corrected_x = filtered_lower_bound_x[i] - x_knots_[index];
     double coef = 1.0;
@@ -109,7 +113,11 @@ bool Spline1dConstraint::AddBoundary(const std::vector<double>& x_coord,
   return inequality_constraint_.AddConstraint(inequality_constraint,
                                               inequality_boundary);
 }
-
+/// @brief 导数约束
+/// @param x_coord 
+/// @param lower_bound 
+/// @param upper_bound 
+/// @return 
 bool Spline1dConstraint::AddDerivativeBoundary(
     const std::vector<double>& x_coord, const std::vector<double>& lower_bound,
     const std::vector<double>& upper_bound) {
@@ -121,7 +129,7 @@ bool Spline1dConstraint::AddDerivativeBoundary(
   if (x_knots_.size() < 2) {
     return false;
   }
-
+  ///筛选
   if (!FilterConstraints(x_coord, lower_bound, upper_bound,
                          &filtered_lower_bound_x, &filtered_lower_bound,
                          &filtered_upper_bound_x, &filtered_upper_bound)) {
@@ -139,6 +147,7 @@ bool Spline1dConstraint::AddDerivativeBoundary(
     std::uint32_t index = FindIndex(filtered_lower_bound_x[i]);
     const double corrected_x = filtered_lower_bound_x[i] - x_knots_[index];
     double coef = 1.0;
+    ///一阶导数
     for (std::uint32_t j = 1; j < spline_order_; ++j) {
       inequality_constraint(i, j + index * spline_order_) = coef * j;
       coef *= corrected_x;
@@ -583,7 +592,15 @@ std::uint32_t Spline1dConstraint::FindIndex(const double x) const {
                   static_cast<std::uint32_t>(upper_bound - x_knots_.begin())) -
          1;
 }
-
+/// @brief 过滤约束条件
+/// @param x_coord x就表示t的意思
+/// @param lower_bound 
+/// @param upper_bound 
+/// @param filtered_lower_bound_x 
+/// @param filtered_lower_bound 
+/// @param filtered_upper_bound_x 
+/// @param filtered_upper_bound 
+/// @return 
 bool Spline1dConstraint::FilterConstraints(
     const std::vector<double>& x_coord, const std::vector<double>& lower_bound,
     const std::vector<double>& upper_bound,
@@ -596,14 +613,14 @@ bool Spline1dConstraint::FilterConstraints(
   filtered_lower_bound_x->clear();
   filtered_upper_bound_x->clear();
 
-  const double inf = std::numeric_limits<double>::infinity();
-
+  const double inf = std::numeric_limits<double>::infinity();///< 无限大
+  ///预分配内存空间给四个向量
   filtered_lower_bound->reserve(lower_bound.size());
   filtered_lower_bound_x->reserve(lower_bound.size());
 
   filtered_upper_bound->reserve(upper_bound.size());
   filtered_upper_bound_x->reserve(upper_bound.size());
-
+  ///判断是否有nan和inf
   for (std::uint32_t i = 0; i < lower_bound.size(); ++i) {
     if (std::isnan(lower_bound[i]) || lower_bound[i] == inf) {
       return false;

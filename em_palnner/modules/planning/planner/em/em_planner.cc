@@ -144,9 +144,11 @@ Status EMPlanner::Plan(const TrajectoryPoint& planning_start_point,
 
   }
   DiscretizedTrajectory trajectory;
+  ///组合路径和速度曲线
   if (!reference_line_info->CombinePathAndSpeedProfile(
           FLAGS_output_trajectory_time_resolution,
           planning_start_point.relative_time(), &trajectory)) {
+    ///todo 是否路径规划完，就存放了笛卡尔信息了
     std::string msg("Fail to aggregate planning trajectory.");
     AERROR << msg;
     return Status(ErrorCode::PLANNING_ERROR, msg);

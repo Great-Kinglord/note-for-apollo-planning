@@ -55,11 +55,11 @@ const Eigen::MatrixXd& AffineConstraint::constraint_boundary() const {
 bool AffineConstraint::AddConstraint(
     const Eigen::MatrixXd& constraint_matrix,
     const Eigen::MatrixXd& constraint_boundary) {
-///todo 暂时不理解，后面再看
+///todo 暂时不理解，后面再看，稍稍理解了
   if (constraint_matrix.rows() != constraint_boundary.rows()) {
     return false;
   }
-
+  ///如果约束矩阵为空，直接赋值，也就是第一次添加约束，后面再添加就要去插入了
   if (constraint_matrix_.rows() == 0) {
     constraint_matrix_ = constraint_matrix;
     constraint_boundary_ = constraint_boundary;
@@ -75,9 +75,9 @@ bool AffineConstraint::AddConstraint(
   Eigen::MatrixXd n_boundary(
       constraint_boundary_.rows() + constraint_boundary.rows(), 1);
   ///使用<<操作符，将constraint_matrix_和constraint_matrix插入到n_matrix
-  n_matrix << constraint_matrix_, constraint_matrix;
+  n_matrix << constraint_matrix_, constraint_matrix;///< 先插入constraint_matrix_，在后面再插入constraint_matrix
   n_boundary << constraint_boundary_, constraint_boundary;
-  constraint_matrix_ = n_matrix;
+  constraint_matrix_ = n_matrix;///< constraint_matrix_是动态大小的矩阵
   constraint_boundary_ = n_boundary;
   return true;
 }

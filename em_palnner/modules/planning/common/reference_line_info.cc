@@ -134,6 +134,11 @@ PathData* ReferenceLineInfo::mutable_path_data() { return &path_data_; }
 
 SpeedData* ReferenceLineInfo::mutable_speed_data() { return &speed_data_; }
 
+/// @brief 合并横着向
+/// @param time_resolution 0.05
+/// @param relative_time 
+/// @param ptr_discretized_trajectory 
+/// @return 
 bool ReferenceLineInfo::CombinePathAndSpeedProfile(
     const double time_resolution, const double relative_time,
     DiscretizedTrajectory* ptr_discretized_trajectory) {
@@ -143,6 +148,7 @@ bool ReferenceLineInfo::CombinePathAndSpeedProfile(
     AWARN << "path data is empty";
     return false;
   }
+  /// 0到8s，每0.05s采样一次
   for (double cur_rel_time = 0.0; cur_rel_time < speed_data_.TotalTime();
        cur_rel_time += time_resolution) {
     common::SpeedPoint speed_point;
@@ -150,11 +156,12 @@ bool ReferenceLineInfo::CombinePathAndSpeedProfile(
       AERROR << "Fail to get speed point with relative time " << cur_rel_time;
       return false;
     }
-
+    ///path_data_中存放path信息
     if (speed_point.s() > path_data_.discretized_path().Length()) {
       break;
     }
     common::PathPoint path_point;
+    ///应该是根据s找到对应的l
     if (!path_data_.GetPathPointWithPathS(speed_point.s(), &path_point)) {
       AERROR << "Fail to get path data with s " << speed_point.s()
              << "path total length " << path_data_.discretized_path().Length();
